@@ -65,6 +65,9 @@
 #ifdef __EMSCRIPTEN__
 #    define OPENRCT2_PLATFORM "Emscripten"
 #endif
+#ifdef __vita__
+    #define OPENRCT2_PLATFORM       "PS Vita"
+#endif
 #ifndef OPENRCT2_PLATFORM
 #    error Unknown platform!
 #endif

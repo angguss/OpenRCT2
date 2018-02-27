@@ -14,7 +14,7 @@
 #    include <windows.h>
 #endif
 
-#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__vita__)
 #    include <dirent.h>
 #    include <sys/stat.h>
 #    include <sys/types.h>
@@ -269,7 +269,7 @@ private:
 
 #endif // _WIN32
 
-#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+#if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__vita__)
 
 class FileScannerUnix final : public FileScannerBase
 {
@@ -350,7 +350,7 @@ IFileScanner* Path::ScanDirectory(const std::string& pattern, bool recurse)
 {
 #ifdef _WIN32
     return new FileScannerWindows(pattern, recurse);
-#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
+#elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__)) || defined(__vita__)
     return new FileScannerUnix(pattern, recurse);
 #endif
 }

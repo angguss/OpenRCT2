@@ -8,6 +8,26 @@ endif ()
 file(GLOB_RECURSE OPENRCT2_CORE_SOURCES "${CMAKE_CURRENT_LIST_DIR}/*.cpp")
 file(GLOB_RECURSE OPENRCT2_CORE_HEADERS "${CMAKE_CURRENT_LIST_DIR}/*.h"
                                         "${CMAKE_CURRENT_LIST_DIR}/*.hpp")
+if (VITA)
+    if( NOT DEFINED CMAKE_TOOLCHAIN_FILE )
+        if(DEFINED ENV{VITASDK})
+            set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "toolchain file")
+        else()
+            message(FATAL_ERROR "Please define VITASDK to point to your SDK path!")
+        endif()
+    endif()
+
+    include("$ENV{VITASDK}/share/vita.cmake" REQUIRED)
+
+    set(STATIC ON)
+    set(DISABLE_HTTP_TWITCH ON)
+    set(DISABLE_NETWORK ON)
+    set(DISABLE_TTF ON)
+    set(DISABLE_OPENGL ON)
+    set(ENABLE_LIGHTFX OFF)
+endif()
+
+# Needed for linking with non-broken OpenSSL on Apple platforms
 if (APPLE)
     file(GLOB_RECURSE OPENRCT2_CORE_MM_SOURCES "${CMAKE_CURRENT_LIST_DIR}/*.mm")
     set_source_files_properties(${OPENRCT2_CORE_MM_SOURCES} PROPERTIES COMPILE_FLAGS "-x objective-c++ -fmodules")
@@ -111,6 +131,11 @@ else ()
     endif ()
 endif ()
 
+if (VITA)
+    target_link_libraries(${PROJECT} c)
+endif()
+
+# Libraries
 if (STATIC)
     target_link_libraries(${PROJECT_NAME} ${JANSSON_STATIC_LIBRARIES}
                                      ${PNG_STATIC_LIBRARIES}
@@ -145,7 +170,7 @@ if (NOT MINGW AND NOT MSVC)
     endif ()
 endif ()
 
-if (NOT APPLE AND NOT MINGW AND NOT MSVC)
+if (NOT APPLE AND NOT MINGW AND NOT MSVC AND NOT VITA)
     # This is ugly hack to work around https://bugs.launchpad.net/ubuntu/+source/gcc-5/+bug/1568899.
     # Once C++17 is enabled (and thus old compilers are no longer supported, this needs to be gone.
     # We cannot simply detect the _compiler_ version, as the bug exists with the C++ _library_
@@ -217,3 +242,17 @@ else ()
     # Dummy target to ease invocation
     add_custom_target(${PROJECT_NAME}-headers-check)
 endif ()
+
+if (VITA)
+    set(VITA_APP_NAME, ${PROJECT})
+    set(VITA_TITLEID "ANGU00002")
+    set(VITA_VERSION "01.00")
+    set(VITA_MKSFOEX_FLAGS "${VITA_MKSFOEX_FLAGS} -d PARENTAL_LEVEL=1")
+
+    vita_create_self(${SHORT_NAME}.self ${SHORT_NAME})
+
+    vita_create_vpk(${SHORT_NAME}.vpk ${VITA_TITLEID} ${SHORT_NAME}.self
+        VERSION ${VITA_VERSION}
+        NAME ${VITA_APP_NAME}
+    )
+endif()

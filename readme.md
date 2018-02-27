@@ -117,6 +117,17 @@ The program can also be built as a command line program using CMake. This type o
 - gl (commonly provided by Mesa or GPU vendors; only for UI client, can be disabled)
 - cmake
 
+### Vita:
+- sdl2
+- freetype
+- libzip (>= 1.0)
+- libpng (>= 1.2)
+- speexdsp (only for UI client)
+- jansson (>= 2.5)
+- zlib
+- cmake
+- vita2d
+
 ---
 
 ## 3.2 Compiling and running
@@ -172,6 +183,14 @@ DESTDIR=. make install # the install target creates all the necessary files in p
 You can also use Ninja in place of Make, if you prefer, see Wiki for details.
 
 Detailed instructions can be found on our [wiki](https://github.com/OpenRCT2/OpenRCT2/wiki/Building-OpenRCT2-on-Linux).
+
+### Vita:
+Identical to linux build only it requires the musl vitasdk (instead of the newlib vitasdk) and the following cmake line
+```
+PKG_CONFIG_PATH=$VITASDK/arm-vita-eabi/lib/pkgconfig cmake -DVITA=ON -DUSE_MMAP=OFF DWITH_TESTS=OFF -DDISABLE_HTTP_TWITCH=ON -DDISABLE_NETWORK=ON ..
+```
+
+An openrct2.vpk will be created in the build directory.
 
 ---
 

@@ -186,6 +186,17 @@ public:
         return _fsResolutions;
     }
 
+#if defined(__vita__)
+    bool HasFocus() override
+    {
+        return true;
+    }
+
+    bool IsMinimised() override
+    {
+        return false;
+    }
+#else
     bool HasFocus() override
     {
         uint32_t windowFlags = GetWindowFlags();
@@ -197,6 +208,7 @@ public:
         uint32_t windowFlags = GetWindowFlags();
         return (windowFlags & SDL_WINDOW_MINIMIZED) || (windowFlags & SDL_WINDOW_HIDDEN);
     }
+#endif
 
     bool IsSteamOverlayActive() override
     {
@@ -699,7 +711,16 @@ private:
             }
         }
     }
+#if defined(__vita__)
+    void UpdateFullscreenResolutions()
+    {
+        auto resolutions = std::vector<Resolution>();
+        resolutions.push_back({ 960, 544 });
+        resolutions.push_back({ 480, 272 });
 
+        _fsResolutions = resolutions;
+    }
+#else
     void UpdateFullscreenResolutions()
     {
         // Query number of display modes
@@ -748,6 +769,7 @@ private:
 
         _fsResolutions = resolutions;
     }
+#endif
 
     Resolution GetClosestResolution(int32_t inWidth, int32_t inHeight)
     {
