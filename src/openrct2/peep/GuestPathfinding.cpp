@@ -657,16 +657,12 @@ static void peep_pathfind_heuristic_search(
                  * tile. */
                 rideIndex = tileElement->AsTrack()->GetRideIndex();
                 Ride* ride = get_ride(rideIndex);
-                if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_IS_SHOP))
-                {
-                    found = true;
-                    searchResult = PATH_SEARCH_SHOP_ENTRANCE;
-                    break;
-                }
-                else
-                {
+                if (!ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_IS_SHOP))
                     continue;
-                }
+
+                found = true;
+                searchResult = PATH_SEARCH_SHOP_ENTRANCE;
+                break;
             }
             case TILE_ELEMENT_TYPE_ENTRANCE:
                 if (loc.z != tileElement->base_height)
@@ -2116,10 +2112,10 @@ int32_t guest_path_finding(rct_peep* peep)
     if (numEntranceStations == 0)
     {
         // closestStationNum is always 0 here.
-        LocationXY8 entranceXY = ride->station_starts[closestStationNum];
+        LocationXY8 entranceXY = ride->stations[closestStationNum].Start;
         loc.x = entranceXY.x;
         loc.y = entranceXY.y;
-        loc.z = ride->station_heights[closestStationNum];
+        loc.z = ride->stations[closestStationNum].Height;
     }
     else
     {

@@ -303,7 +303,7 @@ int32_t viewport_interaction_get_item_right(int32_t x, int32_t y, viewport_inter
                 stationIndex = tileElement->AsTrack()->GetStationIndex();
 
             for (i = stationIndex; i >= 0; i--)
-                if (ride->station_starts[i].xy == RCT_XY8_UNDEFINED)
+                if (ride->stations[i].Start.xy == RCT_XY8_UNDEFINED)
                     stationIndex--;
             stationIndex++;
             set_map_tooltip_format_arg(12, uint16_t, stationIndex);
@@ -504,7 +504,7 @@ static void viewport_interaction_remove_footpath(TileElement* tileElement, int32
  */
 static void viewport_interaction_remove_footpath_item(TileElement* tileElement, int32_t x, int32_t y)
 {
-    int32_t type = tileElement->AsPath()->GetEntryIndex();
+    int32_t type = tileElement->AsPath()->GetPathEntryIndex();
     if (tileElement->AsPath()->IsQueue())
         type |= 0x80;
 

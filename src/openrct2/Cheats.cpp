@@ -370,8 +370,8 @@ static void cheat_remove_all_guests()
 
         for (size_t stationIndex = 0; stationIndex < MAX_STATIONS; stationIndex++)
         {
-            ride->queue_length[stationIndex] = 0;
-            ride->last_peep_in_queue[stationIndex] = SPRITE_INDEX_NULL;
+            ride->stations[stationIndex].QueueLength = 0;
+            ride->stations[stationIndex].LastPeepInQueue = SPRITE_INDEX_NULL;
         }
 
         for (auto trainIndex : ride->vehicles)
@@ -876,10 +876,7 @@ const char* cheats_get_cheat_string(int cheat, int edx, int edi)
             {
                 return language_get_string(STR_CHEAT_MOWED_GRASS);
             }
-            else if (edx == 1)
-            {
-                return language_get_string(STR_CHEAT_CLEAR_GRASS);
-            }
+            return language_get_string(STR_CHEAT_CLEAR_GRASS);
         case CHEAT_WATERPLANTS:
             return language_get_string(STR_CHEAT_WATER_PLANTS);
         case CHEAT_FIXVANDALISM:

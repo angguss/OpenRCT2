@@ -767,7 +767,7 @@ static void window_top_toolbar_invalidate(rct_window* w)
                 break;
             case NETWORK_MODE_CLIENT:
                 window_top_toolbar_widgets[WIDX_PAUSE].type = WWT_EMPTY;
-            // Fall-through
+                [[fallthrough]];
             case NETWORK_MODE_SERVER:
                 window_top_toolbar_widgets[WIDX_FASTFORWARD].type = WWT_EMPTY;
                 break;
@@ -1458,7 +1458,7 @@ static void sub_6E1F34(
             if (tile_element->AsPath()->IsSloped())
                 *parameter_1 |= FOOTPATH_PROPERTIES_FLAG_IS_SLOPED << 8;
             *parameter_2 = tile_element->base_height;
-            *parameter_2 |= (tile_element->AsPath()->GetEntryIndex() << 8);
+            *parameter_2 |= (tile_element->AsPath()->GetPathEntryIndex() << 8);
             if (tile_element->AsPath()->IsQueue())
             {
                 *parameter_2 |= LOCATION_NULL;
