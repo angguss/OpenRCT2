@@ -134,8 +134,10 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
     PHYSFS_init(nullptr);
     PHYSFS_mount(basePaths[(size_t)DIRBASE::USER].c_str(), "/write/openrct", 0);
     PHYSFS_setWriteDir(basePaths[(size_t)DIRBASE::USER].c_str());
-    PHYSFS_mount("c:/tmp/openrct2/openrct2.zip", NULL, 0);
-
+    std::string exePath = Platform::GetCurrentExecutablePath();
+    Path::ConvertPathSlashes(exePath);
+    PHYSFS_mount(Path::Combine(Path::GetDirectory(exePath), "openrct2.zip").c_str(), NULL, 0);
+    
     for (int i = 0; i < DIRBASE_COUNT; i++)
     {
         basePaths[i] = "/";

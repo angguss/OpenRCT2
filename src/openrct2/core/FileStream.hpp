@@ -77,30 +77,25 @@ public:
 
 #ifdef _WIN32
 #    ifdef __ENABLE_PHYSFS__
+        std::string path_str = std::string(path);
+        size_t found = path_str.find("C:");
+        if (found != std::string::npos)
+        {
+            path_str = path_str.replace(found, std::string("C:").length(), "");
+        }
+
+        Path::ConvertPathSlashes(path_str);
+
         switch (fileMode)
         {
             case FILE_MODE_OPEN:
-            {
-                std::string path_str = std::string(path);
-                std::size_t found = path_str.find("C:\\Users\\Angus\\Documents\\dev\\OpenRCT2\\bin");
-
-                if (found != std::string::npos)
-                {
-                    path_str.replace(
-                        path_str.find("C:\\Users\\Angus\\Documents\\dev\\OpenRCT2\\bin"),
-                        std::string("C:\\Users\\Angus\\Documents\\dev\\OpenRCT2\\bin").length(), "");
-                }
-
-                Path::ConvertPathSlashes(path_str);
                 _file = PHYSFS_openRead(path_str.c_str());
-            }
-            break;
+                break;
             case FILE_MODE_WRITE:
-                _file = PHYSFS_openWrite(path);
+                _file = PHYSFS_openWrite(path_str.c_str());
                 break;
             case FILE_MODE_APPEND:
                 _file = PHYSFS_openAppend(path);
-                break;
                 break;
         }
 #    else
