@@ -47,13 +47,23 @@ namespace File
     std::vector<uint8_t> ReadAllBytes(const std::string_view& path)
     {
         std::vector<uint8_t> result;
+#ifdef __ENABLE_PHYSFS__
+        PHYSFS_File* f = PHYSFS_openRead(path.data());
 
-#if defined(_WIN32) && !defined(__MINGW32__)
+        PHYSFS_Stat s;
+        PHYSFS_stat(path.data(), &s);
+        result.resize(s.filesize);
+        PHYSFS_readBytes(f, &result[0], s.filesize);
+        PHYSFS_close(f);
+
+        return result;
+#else
+#    if defined(_WIN32) && !defined(__MINGW32__)
         auto pathW = String::ToUtf16(std::string(path));
         std::ifstream fs(pathW, std::ios::in | std::ios::binary);
-#else
+#    else
         std::ifstream fs(std::string(path), std::ios::in | std::ios::binary);
-#endif
+#    endif
         if (!fs.is_open())
         {
             throw IOException("Unable to open " + std::string(path.data()));
@@ -75,6 +85,8 @@ namespace File
             fs.exceptions(fs.failbit);
         }
         return result;
+
+#endif
     }
 
     std::string ReadAllText(const std::string_view& path)
@@ -125,6 +137,11 @@ namespace File
     {
         uint64_t lastModified = 0;
 #ifdef _WIN32
+#    ifdef __ENABLE_PHYSFS__
+        PHYSFS_Stat stat;
+        PHYSFS_stat(path.c_str(), &stat);
+        lastModified = stat.modtime;
+#    else
         auto pathW = utf8_to_widechar(path.c_str());
         auto hFile = CreateFileW(pathW, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
         if (hFile != INVALID_HANDLE_VALUE)
@@ -137,6 +154,7 @@ namespace File
             CloseHandle(hFile);
         }
         free(pathW);
+#    endif
 #else
         struct stat statInfo
         {

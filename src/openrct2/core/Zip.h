@@ -15,6 +15,11 @@
 #include <string_view>
 #include <vector>
 
+#ifdef __ENABLE_PHYSFS__
+#include <physfs.h>
+#include "Path.hpp"
+#endif
+
 /**
  * Represents a zip file.
  */

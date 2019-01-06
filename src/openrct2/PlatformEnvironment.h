@@ -13,6 +13,9 @@
 
 #include <memory>
 #include <string>
+#ifdef __ENABLE_PHYSFS__
+#include <physfs.h>
+#endif
 
 namespace OpenRCT2
 {

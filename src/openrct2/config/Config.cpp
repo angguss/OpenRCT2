@@ -778,6 +778,11 @@ bool config_save_default()
 bool config_find_or_browse_install_directory()
 {
     std::string path = Config::FindRCT2Path();
+#ifdef __ENABLE_PHYSFS__
+    // This is hacky, FindRCT2Path will give us an absolute real path
+    // but we want to redirect to the root of physfs
+    path = "/";
+#endif
     if (!path.empty())
     {
         Memory::Free(gConfigGeneral.rct2_path);

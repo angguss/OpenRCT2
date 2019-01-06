@@ -40,6 +40,9 @@ namespace Path
     bool Equals(const std::string& a, const std::string& b);
     bool Equals(const utf8* a, const utf8* b);
 
+    // Convert backslashes in a path to forwardslashes (in-place)
+    void ConvertPathSlashes(std::string& path);
+
     /**
      * Checks if the given path is a file. If not, checks to see if
      * there are any files with different casing and selects the first

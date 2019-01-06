@@ -227,6 +227,22 @@ public:
 
     void GetDirectoryChildren(std::vector<DirectoryChild>& children, const std::string& path) override
     {
+#ifdef __ENABLE_PHYSFS__
+        char **files = PHYSFS_enumerateFiles(path.c_str());
+
+        if (files == nullptr)
+            return;
+
+        int i = 0;
+        char* file = files[i];
+        while (file != nullptr)
+        {
+            DirectoryChild child = CreateChild(path, file);
+            children.push_back(child);
+            i++;
+            file = files[i];
+        }
+#else
         std::string pattern = path + "\\*";
         wchar_t* wPattern = utf8_to_widechar(pattern.c_str());
 
@@ -246,9 +262,32 @@ public:
         }
 
         Memory::Free(wPattern);
+#endif
     }
 
 private:
+#ifdef __ENABLE_PHYSFS__
+    static DirectoryChild CreateChild(std::string path, std::string child)
+    {
+        DirectoryChild result;
+
+        PHYSFS_Stat stat;
+        PHYSFS_stat(Path::Combine(path, child).c_str(), &stat);
+        result.Name = child;
+        if (stat.filetype == PHYSFS_FileType::PHYSFS_FILETYPE_DIRECTORY)
+        {
+            result.Type = DIRECTORY_CHILD_TYPE::DC_DIRECTORY;
+        }
+        else
+        {
+            result.Type = DIRECTORY_CHILD_TYPE::DC_FILE;
+            result.Size = stat.filesize;
+            result.LastModified = stat.modtime;
+        }
+
+        return result;
+    }
+#else
     static DirectoryChild CreateChild(const WIN32_FIND_DATAW* child)
     {
         DirectoryChild result;
@@ -270,6 +309,7 @@ private:
         }
         return result;
     }
+#endif
 };
 
 #endif // _WIN32

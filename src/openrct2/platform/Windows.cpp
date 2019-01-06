@@ -82,19 +82,32 @@ void platform_get_time_local(rct2_time* out_time)
 
 bool platform_file_exists(const utf8* path)
 {
+#    ifdef __ENABLE_PHYSFS__
+    return PHYSFS_exists(path);
+#    else
     wchar_t* wPath = utf8_to_widechar(path);
     DWORD result = GetFileAttributesW(wPath);
     DWORD error = GetLastError();
     free(wPath);
     return !(result == INVALID_FILE_ATTRIBUTES && (error == ERROR_FILE_NOT_FOUND || error == ERROR_PATH_NOT_FOUND));
+#    endif
 }
 
 bool platform_directory_exists(const utf8* path)
 {
+#    ifdef __ENABLE_PHYSFS__
+    if (!PHYSFS_exists(path))
+        return false;
+
+    PHYSFS_Stat stat;
+    PHYSFS_stat(path, &stat);
+    return stat.filetype == PHYSFS_FileType::PHYSFS_FILETYPE_DIRECTORY;
+#    else
     wchar_t* wPath = utf8_to_widechar(path);
     DWORD dwAttrib = GetFileAttributesW(wPath);
     free(wPath);
     return dwAttrib != INVALID_FILE_ATTRIBUTES && (dwAttrib & FILE_ATTRIBUTE_DIRECTORY);
+#    endif
 }
 
 bool platform_original_game_data_exists(const utf8* path)
@@ -122,16 +135,24 @@ bool platform_original_rct1_data_exists(const utf8* path)
 bool platform_ensure_directory_exists(const utf8* path)
 {
     if (platform_directory_exists(path))
-        return 1;
+        return true;
 
+#    ifdef __ENABLE_PHYSFS__
+    int success = PHYSFS_mkdir(path);
+#    else
     wchar_t* wPath = utf8_to_widechar(path);
     BOOL success = CreateDirectoryW(wPath, nullptr);
     free(wPath);
+#    endif
+
     return success == TRUE;
 }
 
 bool platform_directory_delete(const utf8* path)
 {
+#    ifdef __ENABLE_PHYSFS__
+    return PHYSFS_delete(path);
+#    else
     wchar_t pszFrom[MAX_PATH];
 
     wchar_t* wPath = utf8_to_widechar(path);
@@ -154,6 +175,7 @@ bool platform_directory_delete(const utf8* path)
 
     int32_t ret = SHFileOperationW(&fileop);
     return (ret == 0);
+#    endif
 }
 
 bool platform_lock_single_instance()
@@ -206,10 +228,14 @@ bool platform_file_move(const utf8* srcPath, const utf8* dstPath)
 
 bool platform_file_delete(const utf8* path)
 {
+#    ifdef __ENABLE_PHYSFS__
+    return PHYSFS_delete(path);
+#    else
     wchar_t* wPath = utf8_to_widechar(path);
     BOOL success = DeleteFileW(wPath);
     free(wPath);
     return success == TRUE;
+#    endif
 }
 
 bool platform_get_steam_path(utf8* outPath, size_t outSize)

@@ -25,7 +25,11 @@ struct rct2_install_info;
 #define INVALID_HANDLE (-1)
 
 #ifdef _WIN32
-#    define PATH_SEPARATOR "\\"
+#    ifdef __ENABLE_PHYSFS__
+#        define PATH_SEPARATOR "/"
+#    else
+#        define PATH_SEPARATOR "\\"
+#    endif
 #    define PLATFORM_NEWLINE "\r\n"
 #else
 #    define PATH_SEPARATOR "/"
@@ -146,6 +150,10 @@ void core_init();
 #    undef CreateDirectory
 #    undef CreateWindow
 #    undef GetMessage
+
+#    ifdef __ENABLE_PHYSFS__
+#        include <physfs.h>
+#    endif
 
 void platform_setup_file_associations();
 void platform_remove_file_associations();

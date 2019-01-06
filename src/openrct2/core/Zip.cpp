@@ -18,6 +18,9 @@ class ZipArchive final : public IZipArchive
 {
 private:
     zip_t* _zip;
+#ifdef __ENABLE_PHYSFS__
+    PHYSFS_File* file;
+#endif
     ZIP_ACCESS _access;
     std::vector<std::vector<uint8_t>> _writeBuffers;
 
@@ -29,9 +32,35 @@ public:
         {
             zipOpenMode = ZIP_CREATE;
         }
+#ifdef __ENABLE_PHYSFS__
+        if (access == ZIP_ACCESS::WRITE)
+        {
+            file = PHYSFS_openWrite(path.data());
+        }
+        else
+        {
+            file = PHYSFS_openRead(path.data());
+        }
 
+        PHYSFS_Stat stat;
+        PHYSFS_stat(path.data(), &stat);
+        if (access == ZIP_ACCESS::READ)
+        {
+            uint8_t* buf = new uint8_t[stat.filesize];
+            PHYSFS_read(file, buf, stat.filesize, 1);
+            zip_error_t er;
+            zip_source_t* zipbuffer = zip_source_buffer_create(buf, stat.filesize, 1, &er);
+            _zip = zip_open_from_source(zipbuffer, 0, &er);
+        }
+        else
+        {
+            int32_t error;
+            _zip = zip_open(Path::Combine(PHYSFS_getWriteDir(), path.data()).c_str(), zipOpenMode, &error);
+        }
+#else
         int32_t error;
         _zip = zip_open(path.data(), zipOpenMode, &error);
+#endif
         if (_zip == nullptr)
         {
             throw IOException("Unable to open zip file.");
@@ -43,6 +72,9 @@ public:
     ~ZipArchive() override
     {
         zip_close(_zip);
+#ifdef __ENABLE_PHYSFS__
+        PHYSFS_close(file);
+#endif
     }
 
     size_t GetNumFiles() const override

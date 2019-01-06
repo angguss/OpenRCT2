@@ -14,6 +14,10 @@
 #include <string>
 #include <vector>
 
+#ifdef __ENABLE_PHYSFS__
+#include <physfs.h>
+#endif
+
 struct FileInfo
 {
     const utf8* Name;

@@ -130,6 +130,22 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
     basePaths[(size_t)DIRBASE::CACHE] = Path::Combine(Platform::GetFolderPath(SPECIAL_FOLDER::USER_CACHE), subDirectory);
     basePaths[(size_t)DIRBASE::DOCUMENTATION] = Platform::GetDocsPath();
 
+#ifdef __ENABLE_PHYSFS__
+    PHYSFS_init(nullptr);
+    PHYSFS_mount(basePaths[(size_t)DIRBASE::USER].c_str(), "/write/openrct", 0);
+    PHYSFS_setWriteDir(basePaths[(size_t)DIRBASE::USER].c_str());
+    PHYSFS_mount("c:/tmp/openrct2/openrct2.zip", NULL, 0);
+
+    for (int i = 0; i < DIRBASE_COUNT; i++)
+    {
+        basePaths[i] = "/";
+    }
+
+    basePaths[(size_t)DIRBASE::OPENRCT2] = "/data";
+    basePaths[(size_t)DIRBASE::USER] = "/write/openrct/";
+    basePaths[(size_t)DIRBASE::CONFIG] = "/write/openrct/";
+    basePaths[(size_t)DIRBASE::CACHE] = "/write/openrct/";
+#endif
     // Override paths that have been specified via the command line
     if (!String::IsNullOrEmpty(gCustomRCT1DataPath))
     {
@@ -187,7 +203,11 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
 // clang-format off
 const char * PlatformEnvironment::DirectoryNamesRCT2[] =
 {
+#ifdef __ENABLE_PHYSFS__
+    "data",
+#else
     "Data",                 // DATA
+#endif
     "Landscapes",           // LANDSCAPE
     nullptr,                // LANGUAGE
     nullptr,                // LOG_CHAT

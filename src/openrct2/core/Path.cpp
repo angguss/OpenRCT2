@@ -203,8 +203,13 @@ namespace Path
 
     std::string GetAbsolute(const std::string& relative)
     {
+#ifdef __ENABLE_PHYSFS__
+        // This is a hack, clean this up to get a real absolute based on physfs mountpoint
+        return relative;
+#else
         utf8 absolute[MAX_PATH];
         return GetAbsolute(absolute, sizeof(absolute), relative.c_str());
+#endif
     }
 
     bool Equals(const std::string& a, const std::string& b)
@@ -260,5 +265,14 @@ namespace Path
         }
 #endif
         return result;
+    }
+
+    void ConvertPathSlashes(std::string &path)
+    {
+        for (size_t i = 0; i < path.length(); i++)
+        {
+            if (path[i] == '\\')
+                path[i] = '/';
+        }
     }
 } // namespace Path

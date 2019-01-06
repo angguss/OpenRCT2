@@ -19,6 +19,7 @@
 #include <openrct2/localisation/Localisation.h>
 #include <openrct2/platform/platform.h>
 #include <openrct2/util/Util.h>
+#include <openrct2/core/File.h>
 #include <vector>
 
 using namespace OpenRCT2;
@@ -212,6 +213,9 @@ static std::string GetChangelogPath()
 static std::string GetChangelogText()
 {
     auto path = GetChangelogPath();
+#ifdef __ENABLE_PHYSFS__
+    return File::ReadAllText(path);
+#else
 #if defined(_WIN32) && !defined(__MINGW32__)
     auto pathW = String::ToUtf16(path);
     auto fs = std::ifstream(pathW, std::ios::in);
@@ -223,6 +227,7 @@ static std::string GetChangelogText()
         throw std::runtime_error("Unable to open " + path);
     }
     return std::string((std::istreambuf_iterator<char>(fs)), std::istreambuf_iterator<char>());
+#endif
 }
 
 static bool window_changelog_read_file()
