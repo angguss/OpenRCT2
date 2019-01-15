@@ -1271,7 +1271,7 @@ static uint8_t staff_mechanic_direction_path(rct_peep* peep, uint8_t validDirect
         gPeepPathFindGoalPosition.z = location.z;
 
         gPeepPathFindIgnoreForeignQueues = false;
-        gPeepPathFindQueueRideIndex = 255;
+        gPeepPathFindQueueRideIndex = RIDE_ID_NULL;
 
 #if defined(DEBUG_LEVEL_1) && DEBUG_LEVEL_1
         pathfind_logging_enable(peep);
@@ -3162,7 +3162,7 @@ bool rct_peep::UpdateFixingLeaveByEntranceExit(bool firstRun, Ride* ride)
 /**
  * rct2: 0x6B7588
  */
-void rct_peep::UpdateRideInspected(int32_t rideIndex)
+void rct_peep::UpdateRideInspected(ride_id_t rideIndex)
 {
     Ride* ride = get_ride(rideIndex);
     ride->lifecycle_flags &= ~RIDE_LIFECYCLE_DUE_INSPECTION;

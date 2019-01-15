@@ -275,7 +275,7 @@ static uint8_t footpath_element_next_in_direction(TileCoordsXYZ loc, TileElement
  * This is the recursive portion of footpath_element_destination_in_direction().
  */
 static uint8_t footpath_element_dest_in_dir(
-    TileCoordsXYZ loc, [[maybe_unused]] TileElement* inputTileElement, uint8_t chosenDirection, uint8_t* outRideIndex,
+    TileCoordsXYZ loc, [[maybe_unused]] TileElement* inputTileElement, uint8_t chosenDirection, ride_id_t* outRideIndex,
     int32_t level)
 {
     TileElement* tileElement;
@@ -301,7 +301,7 @@ static uint8_t footpath_element_dest_in_dir(
             {
                 if (loc.z != tileElement->base_height)
                     continue;
-                int32_t rideIndex = tileElement->AsTrack()->GetRideIndex();
+                ride_id_t rideIndex = tileElement->AsTrack()->GetRideIndex();
                 Ride* ride = get_ride(rideIndex);
                 if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_IS_SHOP))
                 {
@@ -394,7 +394,7 @@ static uint8_t footpath_element_dest_in_dir(
  * width path, for example that leads from a ride exit back to the main path.
  */
 static uint8_t footpath_element_destination_in_direction(
-    TileCoordsXYZ loc, TileElement* inputTileElement, uint8_t chosenDirection, uint8_t* outRideIndex)
+    TileCoordsXYZ loc, TileElement* inputTileElement, uint8_t chosenDirection, ride_id_t* outRideIndex)
 {
     if (inputTileElement->AsPath()->IsSloped())
     {
@@ -646,7 +646,7 @@ static void peep_pathfind_heuristic_search(
         if (tileElement->flags & TILE_ELEMENT_FLAG_GHOST)
             continue;
 
-        uint8_t rideIndex = 0xFF;
+        ride_id_t rideIndex = RIDE_ID_NULL;
         switch (tileElement->GetType())
         {
             case TILE_ELEMENT_TYPE_TRACK:
@@ -1571,7 +1571,7 @@ static int32_t guest_path_find_entering_park(rct_peep* peep, [[maybe_unused]] Ti
 
     gPeepPathFindGoalPosition = { x / 32, y / 32, z >> 3 };
     gPeepPathFindIgnoreForeignQueues = true;
-    gPeepPathFindQueueRideIndex = 255;
+    gPeepPathFindQueueRideIndex = RIDE_ID_NULL;
 
     int32_t chosenDirection = peep_pathfind_choose_direction({ peep->next_x / 32, peep->next_y / 32, peep->next_z }, peep);
 
@@ -1632,7 +1632,7 @@ static int32_t guest_path_find_leaving_park(rct_peep* peep, [[maybe_unused]] Til
     }
 
     gPeepPathFindIgnoreForeignQueues = true;
-    gPeepPathFindQueueRideIndex = 255;
+    gPeepPathFindQueueRideIndex = RIDE_ID_NULL;
     direction = peep_pathfind_choose_direction({ peep->next_x / 32, peep->next_y / 32, peep->next_z }, peep);
     if (direction == 0xFF)
         return guest_path_find_aimless(peep, edges);
@@ -1683,7 +1683,7 @@ static int32_t guest_path_find_park_entrance(rct_peep* peep, [[maybe_unused]] Ti
 
     gPeepPathFindGoalPosition = { x / 32, y / 32, z >> 3 };
     gPeepPathFindIgnoreForeignQueues = true;
-    gPeepPathFindQueueRideIndex = 255;
+    gPeepPathFindQueueRideIndex = RIDE_ID_NULL;
 
 #if defined(DEBUG_LEVEL_1) && DEBUG_LEVEL_1
     pathfind_logging_enable(peep);
@@ -1972,7 +1972,7 @@ int32_t guest_path_finding(rct_peep* peep)
             if (!(adjustedEdges & (1 << chosenDirection)))
                 continue;
 
-            uint8_t rideIndex, pathSearchResult;
+            ride_id_t rideIndex, pathSearchResult;
             pathSearchResult = footpath_element_destination_in_direction(loc, tileElement, chosenDirection, &rideIndex);
             switch (pathSearchResult)
             {
@@ -2032,7 +2032,7 @@ int32_t guest_path_finding(rct_peep* peep)
     }
 
     // Peep is heading for a ride.
-    uint8_t rideIndex = peep->guest_heading_to_ride_id;
+    ride_id_t rideIndex = peep->guest_heading_to_ride_id;
     Ride* ride = get_ride(rideIndex);
 
     if (ride->status != RIDE_STATUS_OPEN)
