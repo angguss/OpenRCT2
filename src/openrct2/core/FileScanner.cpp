@@ -228,7 +228,16 @@ public:
     void GetDirectoryChildren(std::vector<DirectoryChild>& children, const std::string& path) override
     {
 #ifdef __ENABLE_PHYSFS__
-        char **files = PHYSFS_enumerateFiles(path.c_str());
+        std::string fixed_path = path;
+        size_t found = fixed_path.find("C:");
+        if (found != std::string::npos)
+        {
+            fixed_path = fixed_path.replace(found, std::string("C:").length(), "");
+        }
+
+        Path::ConvertPathSlashes(fixed_path);
+
+        char** files = PHYSFS_enumerateFiles(fixed_path.c_str());
 
         if (files == nullptr)
             return;
@@ -237,7 +246,7 @@ public:
         char* file = files[i];
         while (file != nullptr)
         {
-            DirectoryChild child = CreateChild(path, file);
+            DirectoryChild child = CreateChild(fixed_path, file);
             children.push_back(child);
             i++;
             file = files[i];
