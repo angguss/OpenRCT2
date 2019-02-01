@@ -130,7 +130,7 @@ bool platform_original_rct1_data_exists(const utf8* path)
 bool platform_ensure_directory_exists(const utf8* path)
 {
 #    ifdef __ENABLE_PHYSFS__
-    return platform_directory_exists_physfs(path);
+    return platform_ensure_directory_exists_physfs(path);
 #    else
     if (platform_directory_exists(path))
         return true;
