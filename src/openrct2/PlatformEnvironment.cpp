@@ -137,7 +137,7 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
 #ifdef _WIN32
     Path::ConvertPathSlashes(userPath);
 #endif
-    PHYSFS_mount(basePaths[(size_t)DIRBASE::USER].c_str(), userPath.c_str(), 0);
+    PHYSFS_mount(basePaths[(size_t)DIRBASE::USER].c_str(), "/", 0);
 
     PHYSFS_setWriteDir(basePaths[(size_t)DIRBASE::USER].c_str());
     std::string exePath = Platform::GetCurrentExecutablePath();
