@@ -14,6 +14,8 @@
 - Feature: [#8191] Allow building on-ride photos and water S-bends on the Water Coaster.
 - Feature: [#8259] Add say command to in-game console.
 - Feature: [#8374] Add replay system.
+- Feature: [#8377] Add option to adjust amount of autosaves to keep.
+- Feature: [#8458] Add sprite sorting benchmark.
 - Feature: [#8583] Add boosters to water coaster.
 - Change: [#7961] Add new object types: station, terrain surface, and terrain edge.
 - Change: [#8222] The climate setting has been moved from objective options to scenario options.
@@ -37,6 +39,7 @@
 - Fix: [#8101] Title sequences window flashes after opening.
 - Fix: [#8120] Crash trying to place peep spawn outside of map.
 - Fix: [#8121] Crash Renaming park with server logging enabled.
+- Fix: [#8141] Attempting to build entrance/exit on station 2 does not work.
 - Fix: [#8142] Reliability of mazes and crooked houses can go below 100%.
 - Fix: [#8187] Cannot set land ownership over ride entrances or exits in sandbox mode.
 - Fix: [#8200] Incorrect behaviour when removing entrances and exits that are on the same tile.
@@ -53,7 +56,12 @@
 - Fix: [#8469] Crash modifying colour on hacked rides.
 - Fix: [#8508] Underground roto-drop is not going up.
 - Fix: [#8555] Multiplayer window text limits are not computed properly.
+- Fix: [#8572] Steel Twister track pieces ID 64 and 65 drawn incorrectly.
+- Fix: [#8584] Duck spawning function does not check tiles with x or y coordinate of 0..63 (original bug).
+- Fix: [#8585] Part of track missing on air powered vertical coaster.
+- Fix: [#8588] Guest list scrolling breaks above ~2000 guests.
 - Fix: [#8591] Game loop does not run at a consistent tick rate of 40 Hz.
+- Fix: [#8653] Crash when peeps attempt to enter a ride with no vehicles.
 - Improved: [#2940] Allow mouse-dragging to set patrol area (Singleplayer only).
 - Improved: [#7730] Draw extreme vertical and lateral Gs red in the ride window's graph tab.
 - Improved: [#7930] Automatically create folders for custom content.

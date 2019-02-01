@@ -152,7 +152,7 @@ public:
             ride->stations[i].Start.xy = RCT_XY8_UNDEFINED;
             ride_clear_entrance_location(ride, i);
             ride_clear_exit_location(ride, i);
-            ride->stations[i].TrainAtStation = 255;
+            ride->stations[i].TrainAtStation = RideStation::NO_TRAIN;
             ride->stations[i].QueueTime = 0;
         }
 
@@ -266,7 +266,7 @@ public:
         }
 
         std::fill(std::begin(ride->num_customers), std::end(ride->num_customers), 0);
-        ride->value = 0xFFFF;
+        ride->value = RIDE_VALUE_UNDEFINED;
         ride->satisfaction = 255;
         ride->satisfaction_time_out = 0;
         ride->satisfaction_next = 0;

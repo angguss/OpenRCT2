@@ -16,6 +16,7 @@
 #include "../localisation/Localisation.h"
 #include "../management/Finance.h"
 #include "../network/network.h"
+#include "../object/FootpathObject.h"
 #include "../object/ObjectList.h"
 #include "../object/ObjectManager.h"
 #include "../paint/VirtualFloor.h"
@@ -2103,14 +2104,14 @@ uint8_t PathElement::GetRailingEntryIndex() const
     return GetPathEntryIndex();
 }
 
-rct_footpath_entry* PathElement::GetPathEntry() const
+PathSurfaceEntry* PathElement::GetPathEntry() const
 {
-    return get_footpath_entry(GetPathEntryIndex());
+    return get_path_surface_entry(GetPathEntryIndex());
 }
 
-rct_footpath_entry* PathElement::GetRailingEntry() const
+PathRailingsEntry* PathElement::GetRailingEntry() const
 {
-    return get_footpath_entry(GetRailingEntryIndex());
+    return get_path_railings_entry(GetRailingEntryIndex());
 }
 
 void PathElement::SetPathEntryIndex(uint8_t newEntryIndex)
@@ -2133,6 +2134,16 @@ void PathElement::SetQueueBannerDirection(uint8_t direction)
 {
     type &= ~FOOTPATH_ELEMENT_TYPE_DIRECTION_MASK;
     type |= (direction << 6);
+}
+
+bool PathElement::ShouldDrawPathOverSupports()
+{
+    return (GetRailingEntry()->flags & RAILING_ENTRY_FLAG_DRAW_PATH_OVER_SUPPORTS);
+}
+
+void PathElement::SetShouldDrawPathOverSupports(bool on)
+{
+    log_verbose("Setting 'draw path over supports' to %d", (size_t)on);
 }
 
 /**
@@ -2251,34 +2262,28 @@ void footpath_update_path_wide_flags(int32_t x, int32_t y)
         pathList[7] = footpath_can_be_wide(x, y, height);
         y += 0x20;
 
-        uint8_t F3EFA5 = 0;
+        uint8_t pathConnections = 0;
         if (tileElement->AsPath()->GetEdges() & EDGE_NW)
         {
-            F3EFA5 |= 0x80;
-            if (pathList[7] != nullptr)
+            pathConnections |= FOOTPATH_CONNECTION_NW;
+            if (pathList[7] != nullptr && pathList[7]->AsPath()->IsWide())
             {
-                if ((pathList[7])->AsPath()->IsWide())
-                {
-                    F3EFA5 &= ~0x80;
-                }
+                pathConnections &= ~FOOTPATH_CONNECTION_NW;
             }
         }
 
         if (tileElement->AsPath()->GetEdges() & EDGE_NE)
         {
-            F3EFA5 |= 0x2;
-            if (pathList[1] != nullptr)
+            pathConnections |= FOOTPATH_CONNECTION_NE;
+            if (pathList[1] != nullptr && pathList[1]->AsPath()->IsWide())
             {
-                if ((pathList[1])->AsPath()->IsWide())
-                {
-                    F3EFA5 &= ~0x2;
-                }
+                pathConnections &= ~FOOTPATH_CONNECTION_NE;
             }
         }
 
         if (tileElement->AsPath()->GetEdges() & EDGE_SE)
         {
-            F3EFA5 |= 0x8;
+            pathConnections |= FOOTPATH_CONNECTION_SE;
             /* In the following:
              * footpath_element_is_wide(pathList[3])
              * is always false due to the tile update order
@@ -2286,14 +2291,14 @@ void footpath_update_path_wide_flags(int32_t x, int32_t y)
              * Commented out since it will never occur. */
             // if (pathList[3] != nullptr) {
             //  if (footpath_element_is_wide(pathList[3])) {
-            //      F3EFA5 &= ~0x8;
+            //      pathConnections &= ~FOOTPATH_CONNECTION_SE;
             //  }
             //}
         }
 
         if (tileElement->AsPath()->GetEdges() & EDGE_SW)
         {
-            F3EFA5 |= 0x20;
+            pathConnections |= FOOTPATH_CONNECTION_SW;
             /* In the following:
              * footpath_element_is_wide(pathList[5])
              * is always false due to the tile update order
@@ -2301,18 +2306,19 @@ void footpath_update_path_wide_flags(int32_t x, int32_t y)
              * Commented out since it will never occur. */
             // if (pathList[5] != nullptr) {
             //  if (footpath_element_is_wide(pathList[5])) {
-            //      F3EFA5 &= ~0x20;
+            //      pathConnections &= ~FOOTPATH_CONNECTION_SW;
             //  }
             //}
         }
 
-        if ((F3EFA5 & 0x80) && (pathList[7] != nullptr) && !(pathList[7])->AsPath()->IsWide())
+        if ((pathConnections & FOOTPATH_CONNECTION_NW) && pathList[7] != nullptr && !pathList[7]->AsPath()->IsWide())
         {
-            if ((F3EFA5 & 2) && (pathList[0] != nullptr) && !(pathList[0])->AsPath()->IsWide()
-                && ((pathList[0]->AsPath()->GetEdges() & 6) == 6) && // N E
-                (pathList[1] != nullptr) && !(pathList[1])->AsPath()->IsWide())
+            constexpr uint8_t edgeMask1 = EDGE_SE | EDGE_SW;
+            if ((pathConnections & FOOTPATH_CONNECTION_NE) && pathList[0] != nullptr && !pathList[0]->AsPath()->IsWide()
+                && (pathList[0]->AsPath()->GetEdges() & edgeMask1) == edgeMask1 && pathList[1] != nullptr
+                && !pathList[1]->AsPath()->IsWide())
             {
-                F3EFA5 |= 0x1;
+                pathConnections |= FOOTPATH_CONNECTION_S;
             }
 
             /* In the following:
@@ -2320,11 +2326,12 @@ void footpath_update_path_wide_flags(int32_t x, int32_t y)
              * is always false due to the tile update order
              * in combination with reset tiles.
              * Short circuit the logic appropriately. */
-            if ((F3EFA5 & 0x20) && (pathList[6] != nullptr) && !(pathList[6])->AsPath()->IsWide()
-                && ((pathList[6]->AsPath()->GetEdges() & 3) == 3) && // N W
-                (pathList[5] != nullptr) && (true || !(pathList[5])->AsPath()->IsWide()))
+            constexpr uint8_t edgeMask2 = EDGE_NE | EDGE_SE;
+            if ((pathConnections & FOOTPATH_CONNECTION_SW) && pathList[6] != nullptr && !pathList[6]->AsPath()->IsWide()
+                && (pathList[6]->AsPath()->GetEdges() & edgeMask2) == edgeMask2 && pathList[5] != nullptr
+                && !(pathList[5])->AsPath()->IsWide())
             {
-                F3EFA5 |= 0x40;
+                pathConnections |= FOOTPATH_CONNECTION_E;
             }
         }
 
@@ -2334,13 +2341,14 @@ void footpath_update_path_wide_flags(int32_t x, int32_t y)
          * are always false due to the tile update order
          * in combination with reset tiles.
          * Short circuit the logic appropriately. */
-        if ((F3EFA5 & 0x8) && (pathList[3] != nullptr) && (true || !(pathList[3])->AsPath()->IsWide()))
+        if ((pathConnections & FOOTPATH_CONNECTION_SE) && pathList[3] != nullptr && !pathList[3]->AsPath()->IsWide())
         {
-            if ((F3EFA5 & 2) && (pathList[2] != nullptr) && (true || !(pathList[2])->AsPath()->IsWide())
-                && ((pathList[2]->AsPath()->GetEdges() & 0xC) == 0xC) && (pathList[1] != nullptr)
-                && (!(pathList[1])->AsPath()->IsWide()))
+            constexpr uint8_t edgeMask1 = EDGE_SW | EDGE_NW;
+            if ((pathConnections & FOOTPATH_CONNECTION_NE) && (pathList[2] != nullptr) && !pathList[2]->AsPath()->IsWide()
+                && (pathList[2]->AsPath()->GetEdges() & edgeMask1) == edgeMask1 && pathList[1] != nullptr
+                && !pathList[1]->AsPath()->IsWide())
             {
-                F3EFA5 |= 0x4;
+                pathConnections |= FOOTPATH_CONNECTION_W;
             }
 
             /* In the following:
@@ -2349,27 +2357,37 @@ void footpath_update_path_wide_flags(int32_t x, int32_t y)
              * are always false due to the tile update order
              * in combination with reset tiles.
              * Short circuit the logic appropriately. */
-            if ((F3EFA5 & 0x20) && (pathList[4] != nullptr) && (true || !(pathList[4])->AsPath()->IsWide())
-                && ((pathList[4]->AsPath()->GetEdges() & 9) == 9) && (pathList[5] != nullptr)
-                && (true || !(pathList[5])->AsPath()->IsWide()))
+            constexpr uint8_t edgeMask2 = EDGE_NE | EDGE_NW;
+            if ((pathConnections & FOOTPATH_CONNECTION_SW) && pathList[4] != nullptr && !pathList[4]->AsPath()->IsWide()
+                && (pathList[4]->AsPath()->GetEdges() & edgeMask2) == edgeMask2 && pathList[5] != nullptr
+                && !pathList[5]->AsPath()->IsWide())
             {
-                F3EFA5 |= 0x10;
+                pathConnections |= FOOTPATH_CONNECTION_N;
             }
         }
 
-        if ((F3EFA5 & 0x80) && (F3EFA5 & (0x40 | 0x1)))
-            F3EFA5 &= ~0x80;
+        if ((pathConnections & FOOTPATH_CONNECTION_NW) && (pathConnections & (FOOTPATH_CONNECTION_E | FOOTPATH_CONNECTION_S)))
+        {
+            pathConnections &= ~FOOTPATH_CONNECTION_NW;
+        }
 
-        if ((F3EFA5 & 0x2) && (F3EFA5 & (0x4 | 0x1)))
-            F3EFA5 &= ~0x2;
+        if ((pathConnections & FOOTPATH_CONNECTION_NE) && (pathConnections & (FOOTPATH_CONNECTION_W | FOOTPATH_CONNECTION_S)))
+        {
+            pathConnections &= ~FOOTPATH_CONNECTION_NE;
+        }
 
-        if ((F3EFA5 & 0x8) && (F3EFA5 & (0x10 | 0x4)))
-            F3EFA5 &= ~0x8;
+        if ((pathConnections & FOOTPATH_CONNECTION_SE) && (pathConnections & (FOOTPATH_CONNECTION_N | FOOTPATH_CONNECTION_W)))
+        {
+            pathConnections &= ~FOOTPATH_CONNECTION_SE;
+        }
 
-        if ((F3EFA5 & 0x20) && (F3EFA5 & (0x40 | 0x10)))
-            F3EFA5 &= ~0x20;
+        if ((pathConnections & FOOTPATH_CONNECTION_SW) && (pathConnections & (FOOTPATH_CONNECTION_E | FOOTPATH_CONNECTION_N)))
+        {
+            pathConnections &= ~FOOTPATH_CONNECTION_SW;
+        }
 
-        if (!(F3EFA5 & (0x2 | 0x8 | 0x20 | 0x80)))
+        if (!(pathConnections
+              & (FOOTPATH_CONNECTION_NE | FOOTPATH_CONNECTION_SE | FOOTPATH_CONNECTION_SW | FOOTPATH_CONNECTION_NW)))
         {
             uint8_t e = tileElement->AsPath()->GetEdgesAndCorners();
             if ((e != 0b10101111) && (e != 0b01011111) && (e != 0b11101111))
@@ -2677,14 +2695,26 @@ void footpath_remove_edges_at(int32_t x, int32_t y, TileElement* tileElement)
         tileElement->AsPath()->SetEdgesAndCorners(0);
 }
 
-rct_footpath_entry* get_footpath_entry(int32_t entryIndex)
+PathSurfaceEntry* get_path_surface_entry(int32_t entryIndex)
 {
-    rct_footpath_entry* result = nullptr;
+    PathSurfaceEntry* result = nullptr;
     auto& objMgr = OpenRCT2::GetContext()->GetObjectManager();
     auto obj = objMgr.GetLoadedObject(OBJECT_TYPE_PATHS, entryIndex);
     if (obj != nullptr)
     {
-        result = (rct_footpath_entry*)obj->GetLegacyData();
+        result = ((FootpathObject*)obj)->GetPathSurfaceEntry();
+    }
+    return result;
+}
+
+PathRailingsEntry* get_path_railings_entry(int32_t entryIndex)
+{
+    PathRailingsEntry* result = nullptr;
+    auto& objMgr = OpenRCT2::GetContext()->GetObjectManager();
+    auto obj = objMgr.GetLoadedObject(OBJECT_TYPE_PATHS, entryIndex);
+    if (obj != nullptr)
+    {
+        result = ((FootpathObject*)obj)->GetPathRailingsEntry();
     }
     return result;
 }

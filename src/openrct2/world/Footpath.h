@@ -36,6 +36,26 @@ struct rct_footpath_entry
 assert_struct_size(rct_footpath_entry, 13);
 #pragma pack(pop)
 
+struct PathSurfaceEntry
+{
+    rct_string_id string_idx;
+    uint32_t image;
+    uint32_t queue_image;
+    uint32_t preview;
+    uint8_t flags;
+};
+
+struct PathRailingsEntry
+{
+    rct_string_id string_idx;
+    uint32_t preview;
+    uint32_t bridge_image;
+    uint32_t railings_image;
+    uint8_t support_type;
+    uint8_t flags;
+    uint8_t scrolling_mode;
+};
+
 // Masks for values stored in TileElement.type
 enum
 {
@@ -78,9 +98,13 @@ enum
 
 enum
 {
-    FOOTPATH_ENTRY_FLAG_HAS_SUPPORT_BASE_SPRITE = (1 << 0),
-    FOOTPATH_ENTRY_FLAG_HAS_PATH_BASE_SPRITE = (1 << 1), // When elevated
     FOOTPATH_ENTRY_FLAG_SHOW_ONLY_IN_SCENARIO_EDITOR = (1 << 2),
+};
+
+enum
+{
+    RAILING_ENTRY_FLAG_HAS_SUPPORT_BASE_SPRITE = (1 << 0),
+    RAILING_ENTRY_FLAG_DRAW_PATH_OVER_SUPPORTS = (1 << 1), // When elevated
 };
 
 enum
@@ -105,6 +129,26 @@ enum
 {
     SLOPE_IS_IRREGULAR_FLAG = (1 << 3), // Flag set in `DefaultPathSlope[]` and checked in `footpath_place_real`
     RAISE_FOOTPATH_FLAG = (1 << 4)
+};
+
+enum
+{
+    FOOTPATH_CORNER_0 = (1 << 0),
+    FOOTPATH_CORNER_1 = (1 << 1),
+    FOOTPATH_CORNER_2 = (1 << 2),
+    FOOTPATH_CORNER_3 = (1 << 3),
+};
+
+enum
+{
+    FOOTPATH_CONNECTION_S = (1 << 0),
+    FOOTPATH_CONNECTION_NE = (1 << 1),
+    FOOTPATH_CONNECTION_W = (1 << 2),
+    FOOTPATH_CONNECTION_SE = (1 << 3),
+    FOOTPATH_CONNECTION_N = (1 << 4),
+    FOOTPATH_CONNECTION_SW = (1 << 5),
+    FOOTPATH_CONNECTION_E = (1 << 6),
+    FOOTPATH_CONNECTION_NW = (1 << 7),
 };
 
 extern uint8_t gFootpathProvisionalFlags;
@@ -158,7 +202,8 @@ int32_t footpath_is_connected_to_map_edge(int32_t x, int32_t y, int32_t z, int32
 void footpath_remove_edges_at(int32_t x, int32_t y, TileElement* tileElement);
 int32_t entrance_get_directions(const TileElement* tileElement);
 
-rct_footpath_entry* get_footpath_entry(int32_t entryIndex);
+PathSurfaceEntry* get_path_surface_entry(int32_t entryIndex);
+PathRailingsEntry* get_path_railings_entry(int32_t entryIndex);
 
 void footpath_queue_chain_reset();
 void footpath_queue_chain_push(ride_id_t rideIndex);

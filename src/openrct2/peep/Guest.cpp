@@ -1724,7 +1724,7 @@ bool rct_peep::ShouldGoOnRide(ride_id_t rideIndex, int32_t entranceNum, bool atQ
     {
         // Peeps that are leaving the park will refuse to go on any rides, with the exception of free transport rides.
         assert(ride->type < std::size(RideData4));
-        if (!(RideData4[ride->type].flags & RIDE_TYPE_FLAG4_TRANSPORT_RIDE) || ride->value == 0xFFFF
+        if (!(RideData4[ride->type].flags & RIDE_TYPE_FLAG4_TRANSPORT_RIDE) || ride->value == RIDE_VALUE_UNDEFINED
             || ride_get_price(ride) != 0)
         {
             if (peep_flags & PEEP_FLAGS_LEAVING_PARK)
@@ -1793,7 +1793,8 @@ bool rct_peep::ShouldGoOnRide(ride_id_t rideIndex, int32_t entranceNum, bool atQ
         // Assuming the queue conditions are met, peeps will always go on free transport rides.
         // Ride ratings, recent crashes and weather will all be ignored.
         money16 ridePrice = ride_get_price(ride);
-        if (!(RideData4[ride->type].flags & RIDE_TYPE_FLAG4_TRANSPORT_RIDE) || ride->value == 0xFFFF || ridePrice != 0)
+        if (!(RideData4[ride->type].flags & RIDE_TYPE_FLAG4_TRANSPORT_RIDE) || ride->value == RIDE_VALUE_UNDEFINED
+            || ridePrice != 0)
         {
             if (previous_ride == rideIndex)
             {
@@ -2323,7 +2324,7 @@ static void peep_go_to_ride_entrance(rct_peep* peep, Ride* ride)
 
 static bool peep_find_vehicle_to_enter(rct_peep* peep, Ride* ride, std::vector<uint8_t>& car_array)
 {
-    uint8_t chosen_train = 0xFF;
+    uint8_t chosen_train = RideStation::NO_TRAIN;
 
     if (ride->mode == RIDE_MODE_BUMPERCAR || ride->mode == RIDE_MODE_RACE)
     {
@@ -2347,7 +2348,7 @@ static bool peep_find_vehicle_to_enter(rct_peep* peep, Ride* ride, std::vector<u
     {
         chosen_train = ride->stations[peep->current_ride_station].TrainAtStation;
     }
-    if (chosen_train == 0xFF)
+    if (chosen_train == RideStation::NO_TRAIN || chosen_train >= MAX_VEHICLES_PER_RIDE)
     {
         return false;
     }
@@ -2357,7 +2358,7 @@ static bool peep_find_vehicle_to_enter(rct_peep* peep, Ride* ride, std::vector<u
     int32_t i = 0;
 
     uint16_t vehicle_id = ride->vehicles[chosen_train];
-    rct_vehicle* vehicle = GET_VEHICLE(vehicle_id);
+    rct_vehicle* vehicle = nullptr;
 
     for (; vehicle_id != SPRITE_INDEX_NULL; vehicle_id = vehicle->next_vehicle_on_train, i++)
     {
@@ -2500,7 +2501,7 @@ static int16_t peep_calculate_ride_value_satisfaction(rct_peep* peep, Ride* ride
         return -30;
     }
 
-    if (ride->value == 0xFFFF)
+    if (ride->value == RIDE_VALUE_UNDEFINED)
     {
         return -30;
     }
