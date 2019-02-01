@@ -74,9 +74,7 @@ public:
             default:
                 throw;
         }
-
-#ifdef _WIN32
-#    ifdef __ENABLE_PHYSFS__
+#ifdef __ENABLE_PHYSFS__
         std::string path_str = std::string(path);
         size_t found = path_str.find("C:");
         if (found != std::string::npos)
@@ -98,14 +96,12 @@ public:
                 _file = PHYSFS_openAppend(path);
                 break;
         }
-#    else
+#elif defined(_WIN32)
         wchar_t* pathW = utf8_to_widechar(path);
         wchar_t* modeW = utf8_to_widechar(mode);
         _file = _wfopen(pathW, modeW);
         free(pathW);
         free(modeW);
-#    endif
-#else
         _file = fopen(path, mode);
 #endif
         if (_file == nullptr)
@@ -152,17 +148,15 @@ public:
     }
     uint64_t GetPosition() const override
     {
-#if defined(_MSC_VER)
-#    ifdef __ENABLE_PHYSFS__
+#ifdef __ENABLE_PHYSFS__
         return PHYSFS_tell(_file);
-#    else
+#elif defined(_MSC_VER)
         return _ftelli64(_file);
-#    endif
-#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#    elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         return ftello(_file);
-#else
+#    else
         return ftello64(_file);
-#endif
+#    endif
     }
 
     void SetPosition(uint64_t position) override
@@ -172,8 +166,7 @@ public:
 
     void Seek(int64_t offset, int32_t origin) override
     {
-#if defined(_MSC_VER)
-#    ifdef __ENABLE_PHYSFS__
+#ifdef __ENABLE_PHYSFS__
         switch (origin)
         {
             case STREAM_SEEK_BEGIN:
@@ -186,7 +179,7 @@ public:
                 PHYSFS_seek(_file, PHYSFS_fileLength(_file) - offset);
                 break;
         }
-#    else
+#elif defined(_MSC_VER)
         switch (origin)
         {
             case STREAM_SEEK_BEGIN:
@@ -199,8 +192,7 @@ public:
                 _fseeki64(_file, offset, SEEK_END);
                 break;
         }
-#    endif
-#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#    elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         switch (origin)
         {
             case STREAM_SEEK_BEGIN:
@@ -213,7 +205,7 @@ public:
                 fseeko(_file, offset, SEEK_END);
                 break;
         }
-#else
+#    else
         switch (origin)
         {
             case STREAM_SEEK_BEGIN:
@@ -226,7 +218,7 @@ public:
                 fseeko64(_file, offset, SEEK_END);
                 break;
         }
-#endif
+#    endif
     }
 
     void Read(void* buffer, uint64_t length) override
@@ -234,28 +226,28 @@ public:
         uint64_t remainingBytes = GetLength() - GetPosition();
         if (length <= remainingBytes)
         {
-#ifdef __ENABLE_PHYSFS__
+#    ifdef __ENABLE_PHYSFS__
             // Physfs returns a negative value for a failed read so if it's
             // read anything, assume it's successful
             if (PHYSFS_readBytes(_file, buffer, length) >= 0)
                 return;
-#else
+#    else
             if (fread(buffer, (size_t)length, 1, _file) == 1)
             {
                 return;
             }
-#endif
+#    endif
         }
         throw IOException("Attempted to read past end of file.");
     }
 
     void Write(const void* buffer, uint64_t length) override
     {
-#ifdef __ENABLE_PHYSFS__
+#    ifdef __ENABLE_PHYSFS__
         if (PHYSFS_writeBytes(_file, buffer, length) < 0)
-#else
+#    else
         if (fwrite(buffer, (size_t)length, 1, _file) != 1)
-#endif
+#    endif
         {
             throw IOException("Unable to write to file.");
         }
@@ -266,11 +258,11 @@ public:
 
     uint64_t TryRead(void* buffer, uint64_t length) override
     {
-#ifdef __ENABLE_PHYSFS__
+#    ifdef __ENABLE_PHYSFS__
         size_t readBytes = PHYSFS_readBytes(_file, buffer, length);
-#else
+#    else
         size_t readBytes = fread(buffer, 1, (size_t)length, _file);
-#endif
+#    endif
         return readBytes;
     }
 };

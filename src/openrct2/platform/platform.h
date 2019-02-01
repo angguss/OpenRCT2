@@ -28,12 +28,15 @@ struct rct2_install_info;
 
 #define INVALID_HANDLE (-1)
 
-#ifdef _WIN32
-#    ifdef __ENABLE_PHYSFS__
-#        define PATH_SEPARATOR "/"
+#if defined(__ENABLE_PHYSFS__)
+#    define PATH_SEPARATOR "/"
+#    if defined(_WIN32)
+#        define PLATFORM_NEWLINE "\r\n"
 #    else
-#        define PATH_SEPARATOR "\\"
+#        define PLATFORM_NEWLINE "\n"
 #    endif
+#elif defined(_WIN32)
+#    define PATH_SEPARATOR "\\"
 #    define PLATFORM_NEWLINE "\r\n"
 #else
 #    define PATH_SEPARATOR "/"
@@ -142,6 +145,16 @@ float platform_get_default_scale();
 // Called very early in the program before parsing commandline arguments.
 void core_init();
 
+#ifdef __ENABLE_PHYSFS__
+#    include <physfs.h>
+
+bool platform_file_exists_physfs(const utf8* path);
+bool platform_directory_exists_physfs(const utf8* path);
+bool platform_ensure_directory_exists_physfs(const utf8* path);
+bool platform_directory_delete_physfs(const utf8* path);
+bool platform_file_delete_physfs(const utf8* path);
+#endif
+
 // Windows specific definitions
 #ifdef _WIN32
 #    ifndef NOMINMAX
@@ -154,10 +167,6 @@ void core_init();
 #    undef CreateDirectory
 #    undef CreateWindow
 #    undef GetMessage
-
-#    ifdef __ENABLE_PHYSFS__
-#        include <physfs.h>
-#    endif
 
 void platform_setup_file_associations();
 void platform_remove_file_associations();

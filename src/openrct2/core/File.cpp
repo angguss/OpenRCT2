@@ -136,12 +136,11 @@ namespace File
     uint64_t GetLastModified(const std::string& path)
     {
         uint64_t lastModified = 0;
-#ifdef _WIN32
-#    ifdef __ENABLE_PHYSFS__
+#ifdef __ENABLE_PHYSFS__
         PHYSFS_Stat stat;
         PHYSFS_stat(path.c_str(), &stat);
         lastModified = stat.modtime;
-#    else
+#elif defined(_WIN32)
         auto pathW = utf8_to_widechar(path.c_str());
         auto hFile = CreateFileW(pathW, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
         if (hFile != INVALID_HANDLE_VALUE)
@@ -154,7 +153,6 @@ namespace File
             CloseHandle(hFile);
         }
         free(pathW);
-#    endif
 #else
         struct stat statInfo
         {

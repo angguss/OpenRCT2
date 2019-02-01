@@ -215,19 +215,15 @@ private:
     }
 };
 
-#ifdef _WIN32
-
-class FileScannerWindows final : public FileScannerBase
+#ifdef __ENABLE_PHYSFS__
+class FileScannerPhysFs final : public FileScannerBase
 {
 public:
-    FileScannerWindows(const std::string& pattern, bool recurse)
-        : FileScannerBase(pattern, recurse)
+    FileScannerPhysFs(const std::string& pattern, bool recurse) : FileScannerBase(pattern, recurse)
     {
     }
 
-    void GetDirectoryChildren(std::vector<DirectoryChild>& children, const std::string& path) override
-    {
-#ifdef __ENABLE_PHYSFS__
+    void GetDirectoryChildren(std::vector<DirectoryChild>& children, const std::string& path) override{
         std::string fixed_path = path;
         size_t found = fixed_path.find("C:");
         if (found != std::string::npos)
@@ -251,31 +247,8 @@ public:
             i++;
             file = files[i];
         }
-#else
-        std::string pattern = path + "\\*";
-        wchar_t* wPattern = utf8_to_widechar(pattern.c_str());
-
-        WIN32_FIND_DATAW findData;
-        HANDLE hFile = FindFirstFileW(wPattern, &findData);
-        if (hFile != INVALID_HANDLE_VALUE)
-        {
-            do
-            {
-                if (lstrcmpW(findData.cFileName, L".") != 0 && lstrcmpW(findData.cFileName, L"..") != 0)
-                {
-                    DirectoryChild child = CreateChild(&findData);
-                    children.push_back(child);
-                }
-            } while (FindNextFileW(hFile, &findData));
-            FindClose(hFile);
-        }
-
-        Memory::Free(wPattern);
-#endif
     }
 
-private:
-#ifdef __ENABLE_PHYSFS__
     static DirectoryChild CreateChild(std::string path, std::string child)
     {
         DirectoryChild result;
@@ -296,7 +269,43 @@ private:
 
         return result;
     }
-#else
+};
+
+#endif
+#ifdef _WIN32
+
+class FileScannerWindows final : public FileScannerBase
+{
+public:
+    FileScannerWindows(const std::string& pattern, bool recurse)
+        : FileScannerBase(pattern, recurse)
+    {
+    }
+
+    void GetDirectoryChildren(std::vector<DirectoryChild>& children, const std::string& path) override
+    {
+        std::string pattern = path + "\\*";
+        wchar_t* wPattern = utf8_to_widechar(pattern.c_str());
+
+        WIN32_FIND_DATAW findData;
+        HANDLE hFile = FindFirstFileW(wPattern, &findData);
+        if (hFile != INVALID_HANDLE_VALUE)
+        {
+            do
+            {
+                if (lstrcmpW(findData.cFileName, L".") != 0 && lstrcmpW(findData.cFileName, L"..") != 0)
+                {
+                    DirectoryChild child = CreateChild(&findData);
+                    children.push_back(child);
+                }
+            } while (FindNextFileW(hFile, &findData));
+            FindClose(hFile);
+        }
+
+        Memory::Free(wPattern);
+    }
+
+private:
     static DirectoryChild CreateChild(const WIN32_FIND_DATAW* child)
     {
         DirectoryChild result;
@@ -318,7 +327,6 @@ private:
         }
         return result;
     }
-#endif
 };
 
 #endif // _WIN32
@@ -402,7 +410,9 @@ private:
 
 IFileScanner* Path::ScanDirectory(const std::string& pattern, bool recurse)
 {
-#ifdef _WIN32
+#ifdef __ENABLE_PHYSFS__
+    return new FileScannerPhysFs(pattern, recurse);
+#elif defined(_WIN32)
     return new FileScannerWindows(pattern, recurse);
 #elif defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
     return new FileScannerUnix(pattern, recurse);
@@ -462,8 +472,8 @@ static uint32_t GetPathChecksum(const utf8* path)
 }
 
 /**
- * Due to FindFirstFile / FindNextFile searching for DOS names as well, *.doc also matches *.docx which isn't what the pattern
- * specified. This will verify if a filename does indeed match the pattern we asked for.
+ * Due to FindFirstFile / FindNextFile searching for DOS names as well, *.doc also matches *.docx which isn't what the
+ * pattern specified. This will verify if a filename does indeed match the pattern we asked for.
  * @remarks Based on algorithm (http://xoomer.virgilio.it/acantato/dev/wildcard/wildmatch.html)
  */
 static bool MatchWildcard(const utf8* fileName, const utf8* pattern)

@@ -83,7 +83,7 @@ void platform_get_time_local(rct2_time* out_time)
 bool platform_file_exists(const utf8* path)
 {
 #    ifdef __ENABLE_PHYSFS__
-    return PHYSFS_exists(path);
+    return platform_file_exists_physfs(path);
 #    else
     wchar_t* wPath = utf8_to_widechar(path);
     DWORD result = GetFileAttributesW(wPath);
@@ -96,12 +96,7 @@ bool platform_file_exists(const utf8* path)
 bool platform_directory_exists(const utf8* path)
 {
 #    ifdef __ENABLE_PHYSFS__
-    if (!PHYSFS_exists(path))
-        return false;
-
-    PHYSFS_Stat stat;
-    PHYSFS_stat(path, &stat);
-    return stat.filetype == PHYSFS_FileType::PHYSFS_FILETYPE_DIRECTORY;
+    return platform_directory_exists_physfs(path);
 #    else
     wchar_t* wPath = utf8_to_widechar(path);
     DWORD dwAttrib = GetFileAttributesW(wPath);
@@ -134,24 +129,24 @@ bool platform_original_rct1_data_exists(const utf8* path)
 
 bool platform_ensure_directory_exists(const utf8* path)
 {
+#    ifdef __ENABLE_PHYSFS__
+    return platform_directory_exists_physfs(path);
+#    else
     if (platform_directory_exists(path))
         return true;
 
-#    ifdef __ENABLE_PHYSFS__
     int success = PHYSFS_mkdir(path);
-#    else
     wchar_t* wPath = utf8_to_widechar(path);
     BOOL success = CreateDirectoryW(wPath, nullptr);
     free(wPath);
-#    endif
-
     return success == TRUE;
+#    endif
 }
 
 bool platform_directory_delete(const utf8* path)
 {
 #    ifdef __ENABLE_PHYSFS__
-    return PHYSFS_delete(path);
+    return platform_directory_delete_physfs(path);
 #    else
     wchar_t pszFrom[MAX_PATH];
 
@@ -229,7 +224,7 @@ bool platform_file_move(const utf8* srcPath, const utf8* dstPath)
 bool platform_file_delete(const utf8* path)
 {
 #    ifdef __ENABLE_PHYSFS__
-    return PHYSFS_delete(path);
+    return platform_file_delete_physfs(path);
 #    else
     wchar_t* wPath = utf8_to_widechar(path);
     BOOL success = DeleteFileW(wPath);
