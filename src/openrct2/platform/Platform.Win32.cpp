@@ -161,7 +161,13 @@ namespace Platform
 
     std::string GetCurrentExecutablePath()
     {
+#ifdef __ENABLE_PHYSFS__
+        std::string exeName = WIN32_GetModuleFileNameW(nullptr);
+        Path::ConvertPathSlashes(exeName, false);
+        return exeName;
+#else
         return WIN32_GetModuleFileNameW(nullptr);
+#endif
     }
 
     std::string GetDocsPath()
