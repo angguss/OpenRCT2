@@ -98,7 +98,7 @@ namespace Platform
                     path = GetFolderPath(SPECIAL_FOLDER::USER_HOME);
                 }
 #    ifdef __ENABLE_PHYSFS__
-                Path::ConvertPathSlashes(path);
+                Path::ConvertPathSlashes(path, false);
 #    endif
                 return path;
             }
@@ -118,7 +118,7 @@ namespace Platform
                     }
                 }
 #    ifdef __ENABLE_PHYSFS__
-                Path::ConvertPathSlashes(path);
+                Path::ConvertPathSlashes(path, false);
 #    endif
                 return path;
             }
@@ -134,7 +134,7 @@ namespace Platform
                     path = Path::Combine(path, "DiscordGames\\RollerCoaster Tycoon 2 Triple Thrill Pack\\content\\Game");
                 }
 #    ifdef __ENABLE_PHYSFS__
-                Path::ConvertPathSlashes(path);
+                Path::ConvertPathSlashes(path, false);
 #    endif
                 return path;
             }

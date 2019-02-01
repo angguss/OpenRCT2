@@ -267,12 +267,33 @@ namespace Path
         return result;
     }
 
-    void ConvertPathSlashes(std::string &path)
+    void ConvertPathSlashes(std::string& path)
     {
+        ConvertPathSlashes(path, true);
+    }
+
+    void ConvertPathSlashes(std::string& path, bool cleanAbsolutePath)
+    {
+        bool absolute = false;
         for (size_t i = 0; i < path.length(); i++)
         {
             if (path[i] == '\\')
                 path[i] = '/';
+            if (path[i] == ':' && cleanAbsolutePath)
+            {
+                absolute = true;
+                if (i + 1 < path.length() && (path[i + 1] == '/' || path[i + 1] == '\\'))
+                {
+                    path.erase(i, 1);
+                    i--;
+                }
+                else
+                    path[i] = '/';
+            }
         }
+#ifdef _WIN32
+        if (absolute)
+            path.insert(path.begin(), '/');
+#endif
     }
 } // namespace Path

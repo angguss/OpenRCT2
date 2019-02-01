@@ -132,10 +132,16 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
 
 #ifdef __ENABLE_PHYSFS__
     PHYSFS_init(nullptr);
-    PHYSFS_mount(basePaths[(size_t)DIRBASE::USER].c_str(), "/write/openrct", 0);
+
+    std::string userPath(basePaths[(size_t)DIRBASE::USER]);
+#ifdef _WIN32
+    Path::ConvertPathSlashes(userPath);
+#endif
+    PHYSFS_mount(basePaths[(size_t)DIRBASE::USER].c_str(), userPath.c_str(), 0);
+
     PHYSFS_setWriteDir(basePaths[(size_t)DIRBASE::USER].c_str());
     std::string exePath = Platform::GetCurrentExecutablePath();
-    Path::ConvertPathSlashes(exePath);
+    Path::ConvertPathSlashes(exePath, false);
     PHYSFS_mount(Path::Combine(Path::GetDirectory(exePath), "openrct2.zip").c_str(), NULL, 0);
     
     for (int i = 0; i < DIRBASE_COUNT; i++)
@@ -144,9 +150,9 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
     }
 
     basePaths[(size_t)DIRBASE::OPENRCT2] = "/data";
-    basePaths[(size_t)DIRBASE::USER] = "/write/openrct/";
-    basePaths[(size_t)DIRBASE::CONFIG] = "/write/openrct/";
-    basePaths[(size_t)DIRBASE::CACHE] = "/write/openrct/";
+    basePaths[(size_t)DIRBASE::USER] = "/";
+    basePaths[(size_t)DIRBASE::CONFIG] = "/";
+    basePaths[(size_t)DIRBASE::CACHE] = "/";
 #endif
     // Override paths that have been specified via the command line
     if (!String::IsNullOrEmpty(gCustomRCT1DataPath))

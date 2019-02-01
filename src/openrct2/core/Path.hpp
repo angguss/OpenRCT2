@@ -42,6 +42,7 @@ namespace Path
 
     // Convert backslashes in a path to forwardslashes (in-place)
     void ConvertPathSlashes(std::string& path);
+    void ConvertPathSlashes(std::string& path, bool cleanAbsolutePath);
 
     /**
      * Checks if the given path is a file. If not, checks to see if
