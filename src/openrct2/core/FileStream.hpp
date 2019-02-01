@@ -36,6 +36,7 @@ class FileStream final : public IStream
 private:
 #ifdef __ENABLE_PHYSFS__
     PHYSFS_file* _file = nullptr;
+    std::string _path;
 #else
     FILE* _file = nullptr;
 #endif
@@ -63,7 +64,7 @@ public:
                 break;
             case FILE_MODE_WRITE:
                 mode = "w+b";
-                _canRead = true;
+                _canRead = false;
                 _canWrite = true;
                 break;
             case FILE_MODE_APPEND:
@@ -96,6 +97,7 @@ public:
                 _file = PHYSFS_openAppend(path);
                 break;
         }
+        _path = path_str;
 #elif defined(_WIN32)
         wchar_t* pathW = utf8_to_widechar(path);
         wchar_t* modeW = utf8_to_widechar(mode);
@@ -152,11 +154,11 @@ public:
         return PHYSFS_tell(_file);
 #elif defined(_MSC_VER)
         return _ftelli64(_file);
-#    elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         return ftello(_file);
-#    else
+#else
         return ftello64(_file);
-#    endif
+#endif
     }
 
     void SetPosition(uint64_t position) override
@@ -192,7 +194,7 @@ public:
                 _fseeki64(_file, offset, SEEK_END);
                 break;
         }
-#    elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#elif (defined(__APPLE__) && defined(__MACH__)) || defined(__ANDROID__) || defined(__OpenBSD__) || defined(__FreeBSD__)
         switch (origin)
         {
             case STREAM_SEEK_BEGIN:
@@ -205,7 +207,7 @@ public:
                 fseeko(_file, offset, SEEK_END);
                 break;
         }
-#    else
+#else
         switch (origin)
         {
             case STREAM_SEEK_BEGIN:
@@ -218,7 +220,7 @@ public:
                 fseeko64(_file, offset, SEEK_END);
                 break;
         }
-#    endif
+#endif
     }
 
     void Read(void* buffer, uint64_t length) override
@@ -226,28 +228,48 @@ public:
         uint64_t remainingBytes = GetLength() - GetPosition();
         if (length <= remainingBytes)
         {
-#    ifdef __ENABLE_PHYSFS__
-            // Physfs returns a negative value for a failed read so if it's
-            // read anything, assume it's successful
-            if (PHYSFS_readBytes(_file, buffer, length) >= 0)
-                return;
-#    else
+#ifdef __ENABLE_PHYSFS__
+            // Existing code (save game) reads a file open in write mode,
+            // so this is necessary
+            if (_canRead == false)
+            {
+                PHYSFS_sint64 previousPos = PHYSFS_tell(_file);
+                PHYSFS_close(_file);
+                PHYSFS_File* f = PHYSFS_openRead(_path.c_str());
+                if (f)
+                {
+                    PHYSFS_seek(f, previousPos);
+                    PHYSFS_readBytes(f, buffer, length);
+                    PHYSFS_close(f);
+                    _file = PHYSFS_openWrite(_path.c_str());
+                    PHYSFS_seek(_file, previousPos);
+                    return;
+                }
+            }
+            else
+            {
+                // Physfs returns a negative value for a failed read so if it's
+                // read anything, assume it's successful
+                if (PHYSFS_readBytes(_file, buffer, length) >= 0)
+                    return;
+            }
+#else
             if (fread(buffer, (size_t)length, 1, _file) == 1)
             {
                 return;
             }
-#    endif
+#endif
         }
         throw IOException("Attempted to read past end of file.");
     }
 
     void Write(const void* buffer, uint64_t length) override
     {
-#    ifdef __ENABLE_PHYSFS__
+#ifdef __ENABLE_PHYSFS__
         if (PHYSFS_writeBytes(_file, buffer, length) < 0)
-#    else
+#else
         if (fwrite(buffer, (size_t)length, 1, _file) != 1)
-#    endif
+#endif
         {
             throw IOException("Unable to write to file.");
         }
@@ -258,11 +280,11 @@ public:
 
     uint64_t TryRead(void* buffer, uint64_t length) override
     {
-#    ifdef __ENABLE_PHYSFS__
+#ifdef __ENABLE_PHYSFS__
         size_t readBytes = PHYSFS_readBytes(_file, buffer, length);
-#    else
+#else
         size_t readBytes = fread(buffer, 1, (size_t)length, _file);
-#    endif
+#endif
         return readBytes;
     }
 };

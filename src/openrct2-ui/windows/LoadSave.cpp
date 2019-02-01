@@ -828,6 +828,17 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
     window_loadsave_widgets[WIDX_NEW_FILE].type = includeNewItem ? WWT_BUTTON : WWT_EMPTY;
     window_loadsave_widgets[WIDX_NEW_FOLDER].type = includeNewItem ? WWT_BUTTON : WWT_EMPTY;
 
+#ifdef __ENABLE_PHYSFS__
+    if (str_is_null_or_empty(directory))
+    {
+        w->disabled_widgets |= (1 << WIDX_NEW_FILE) | (1 << WIDX_NEW_FOLDER) | (1 << WIDX_UP);
+        LoadSaveListItem root;
+        root.path = std::string("/");
+        root.name = "PhysRoot";
+        root.type = TYPE_DIRECTORY;
+        _listItems.push_back(root);
+    }
+#else
     int32_t drives = platform_get_drives();
     if (str_is_null_or_empty(directory) && drives)
     {
@@ -847,6 +858,7 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
             }
         }
     }
+#endif
     else
     {
         // Remove the separator at the end of the path, if present
@@ -863,11 +875,13 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
         {
             *(ch + 1) = '\0';
         }
+#ifndef __ENABLE_PHYSFS__
         else if (drives)
         {
             // If on Windows, clear the entire path to show the drives
             _parentDirectory[0] = '\0';
         }
+#endif
         else
         {
             // Else, go to the root directory
@@ -875,11 +889,17 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
         }
 
         // Disable the Up button if the current directory is the root directory
+#ifdef __ENABLE_PHYSFS__
+        if (str_is_null_or_empty(_parentDirectory))
+            w->disabled_widgets |= (1 << WIDX_UP);
+        else
+            w->disabled_widgets &= ~(1 << WIDX_UP);
+#else
         if (str_is_null_or_empty(_parentDirectory) && !drives)
             w->disabled_widgets |= (1 << WIDX_UP);
         else
             w->disabled_widgets &= ~(1 << WIDX_UP);
-
+#endif
         // Re-enable the "new" buttons if these were disabled
         w->disabled_widgets &= ~(1 << WIDX_NEW_FILE);
         w->disabled_widgets &= ~(1 << WIDX_NEW_FOLDER);
@@ -890,6 +910,11 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
         {
             auto subDir = sdName + PATH_SEPARATOR;
 
+#ifdef __ENABLE_PHYSFS__
+            // Need to unhardcode this
+            if (subDir == "data/")
+                continue;
+#endif
             LoadSaveListItem newListItem;
             newListItem.path = Path::Combine(absoluteDirectory, subDir);
             newListItem.name = subDir;
@@ -1112,10 +1137,10 @@ static void window_loadsave_select(rct_window* w, const char* path)
     }
 }
 
-#pragma region Overwrite prompt
+#    pragma region Overwrite prompt
 
-#define OVERWRITE_WW 200
-#define OVERWRITE_WH 100
+#    define OVERWRITE_WW 200
+#    define OVERWRITE_WH 100
 
 enum
 {
@@ -1229,4 +1254,4 @@ static void window_overwrite_prompt_paint(rct_window* w, rct_drawpixelinfo* dpi)
     gfx_draw_string_centred_wrapped(dpi, gCommonFormatArgs, x, y, w->width - 4, STR_FILEBROWSER_OVERWRITE_PROMPT, COLOUR_BLACK);
 }
 
-#pragma endregion
+#    pragma endregion
