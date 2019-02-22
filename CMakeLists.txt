@@ -1,10 +1,12 @@
 # CMAKE project for openrct2
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.9)
 if (CMAKE_BINARY_DIR STREQUAL CMAKE_SOURCE_DIR)
     message(FATAL_ERROR "Building in-source is not supported! Create a build dir and remove ${CMAKE_SOURCE_DIR}/CMakeCache.txt")
 endif()
 
 project(openrct2 CXX)
+
+include(cmake/platform.cmake)
 
 if (NOT MSVC)
     include(FindPkgConfig)
@@ -53,6 +55,14 @@ if (PORTABLE OR WIN32)
     set(CMAKE_INSTALL_RPATH "$ORIGIN")
 endif ()
 
+# LIST of supported flags, use SET_CHECK_CXX_FLAGS() to apply to target.
+# Use ADD_CHECK_CXX_COMPILER_FLAG() to add to list.
+list(APPEND SUPPORTED_CHECK_CXX_COMPILER_FLAGS)
+
+include(cmake/ipo.cmake)
+list(APPEND IPO_ENABLED_BUILDS RELEASE RELWITHDEBINFO MINSIZEREL)
+ipo_enable("${IPO_ENABLED_BUILDS}")
+
 # Describe current version in terms of closest tag
 execute_process(
     COMMAND git describe HEAD
@@ -81,7 +91,76 @@ execute_process(
     ERROR_QUIET
 )
 
+
+# Defines
+if (USE_MMAP)
+    add_definitions(-DUSE_MMAP)
+endif ()
+if (DISABLE_NETWORK)
+    add_definitions(-DDISABLE_NETWORK)
+endif ()
+if (DISABLE_HTTP_TWITCH)
+    add_definitions(-DDISABLE_HTTP)
+    add_definitions(-DDISABLE_TWITCH)
+endif ()
+if (DISABLE_TTF)
+    add_definitions(-DNO_TTF)
+endif ()
+if (ENABLE_LIGHTFX)
+    add_definitions(-D__ENABLE_LIGHTFX__)
+endif ()
+
+if (CXX_WARN_SUGGEST_FINAL_TYPES)
+    # Disable -Wsuggest-final-types via pragmas where due.
+   add_definitions(-D__WARN_SUGGEST_FINAL_TYPES__)
+endif ()
+
+if (CXX_WARN_SUGGEST_FINAL_METHODS)
+    # Disable -Wsuggest-final-methods via pragmas where due.
+   add_definitions(-D__WARN_SUGGEST_FINAL_METHODS__)
+endif ()
+
+if(EXISTS "${ROOT_DIR}/discord-rpc")
+    # Don't build discord's examples, some of which are in C and do not honour
+    # the flags we set for C++. Also we don't use the provided examples.
+    set(BUILD_EXAMPLES OFF CACHE BOOL "Build example apps")
+    add_subdirectory("${ROOT_DIR}/discord-rpc")
+    add_definitions(-D__ENABLE_DISCORD__)
+    include_directories("${ROOT_DIR}/discord-rpc/include")
+    set(HAVE_DISCORD_RPC TRUE)
+    message("Building with discord-rpc support")
+else()
+	message("No discord-rpc detected, to enable clone discord-rpc to root directory: ${ROOT_DIR}")
+endif()
+
+# Copied from https://github.com/opencv/opencv/blob/dcdd6af5a856826fe62c95322145731e702e54c5/cmake/OpenCVDetectCXXCompiler.cmake#L63-L70
+if(MSVC64 OR MINGW64)
+    set(X86_64 1)
+elseif(MINGW OR (MSVC AND NOT CMAKE_CROSSCOMPILING))
+    set(X86 1)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "amd64.*|x86_64.*|AMD64.*")
+    set(X86_64 1)
+elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "i686.*|i386.*|x86.*|amd64.*|AMD64.*")
+    set(X86 1)
+endif()
+
+# Check if a flag exists and add it to the list of compiler (so, not linker) options
 function (ADD_CHECK_CXX_COMPILER_FLAG _CXXFLAGS _CACHE_VAR _FLAG)
+    CHECK_CXX_COMPILER_FLAG("${_FLAG}" "${_CACHE_VAR}")
+    if (${_CACHE_VAR})
+        list(APPEND SUPPORTED_CHECK_CXX_COMPILER_FLAGS "${_FLAG}")
+    else ()
+        message(STATUS "Unsupported CXXFLAG: ${_FLAG}")
+    endif ()
+endfunction ()
+
+# Add check flags to a compile TARGET
+function (SET_CHECK_CXX_FLAGS _TARGET)
+    target_compile_options("${_TARGET}" PRIVATE "${SUPPORTED_CHECK_CXX_COMPILER_FLAGS}")
+endfunction()
+
+# Check if a flag exists and add it to the compiler and the linker options
+function (ADD_CHECK_CXX_FLAG _CXXFLAGS _CACHE_VAR _FLAG)
     CHECK_CXX_COMPILER_FLAG("${_FLAG}" "${_CACHE_VAR}")
     if (${_CACHE_VAR})
         set(${_CXXFLAGS} "${${_CXXFLAGS}} ${_FLAG}" PARENT_SCOPE)
@@ -91,13 +170,15 @@ function (ADD_CHECK_CXX_COMPILER_FLAG _CXXFLAGS _CACHE_VAR _FLAG)
 endfunction ()
 
 if (MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8 /permissive- /Zc:externConstexpr /WX")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /utf-8 /permissive- /Zc:externConstexpr /EHsc /WX")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4244") # C4244: 'conversion_type': conversion from 'type1' to 'type2', possible loss of data
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /wd4068") # C4068: unknown pragma
 
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     add_definitions(-D_SCL_SECURE_NO_WARNINGS)
     add_definitions(-D__SSE4_1__)
     add_definitions(-D__AVX2__)
+    add_definitions(-DNOMINMAX)
 else ()
     ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS CXX_WARN_NULL_DEREFERENCE -Wnull-dereference)
     ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS CXX_WARN_SUGGEST_FINAL_TYPES -Wsuggest-final-types)
@@ -113,7 +194,7 @@ else ()
     ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS CXX_WARN_LOGICAL_OP -Wlogical-op)
     ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS CXX_WARN_RANGE_LOOP_ANALYSIS -Wrange-loop-analysis)
     ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS CXX_WARN_TAUTOLOGICAL_ZERO_COMPARE -Wtautological-unsigned-zero-compare)
-    ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS CXX_WNO_CLOBBERED -Wno-clobbered)
+    ADD_CHECK_CXX_FLAG(CMAKE_CXX_FLAGS CXX_WNO_CLOBBERED -Wno-clobbered)
     # Disabled due to problems compiling OpenSSL on macOS.
     # ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS CXX_WARN_DOCUMENTATION -Wdocumentation)
 

@@ -16,6 +16,7 @@
 #include "../ReplayManager.h"
 #include "../Version.h"
 #include "../actions/ClimateSetAction.hpp"
+#include "../actions/StaffSetCostumeAction.hpp"
 #include "../config/Config.h"
 #include "../core/Guard.hpp"
 #include "../core/String.hpp"
@@ -441,8 +442,8 @@ static int32_t cc_staff(InteractiveConsole& console, const arguments_t& argv)
                     return 1;
                 }
 
-                int32_t costume = int_val[1] | 0x80;
-                game_do_command(peep->x, (costume << 8) | 1, peep->y, int_val[0], GAME_COMMAND_SET_STAFF_ORDER, 0, 0);
+                uint8_t costume = int_val[1];
+                auto staffSetCostumeAction = StaffSetCostumeAction(int_val[0], costume);
             }
         }
     }
@@ -525,9 +526,9 @@ static int32_t cc_get(InteractiveConsole& console, const arguments_t& argv)
             console.WriteFormatLine(
                 "guest_prefer_more_intense_rides %d", (gParkFlags & PARK_FLAGS_PREF_MORE_INTENSE_RIDES) != 0);
         }
-        else if (argv[0] == "forbid_marketing_campagns")
+        else if (argv[0] == "forbid_marketing_campaigns")
         {
-            console.WriteFormatLine("forbid_marketing_campagns %d", (gParkFlags & PARK_FLAGS_FORBID_MARKETING_CAMPAIGN) != 0);
+            console.WriteFormatLine("forbid_marketing_campaigns %d", (gParkFlags & PARK_FLAGS_FORBID_MARKETING_CAMPAIGN) != 0);
         }
         else if (argv[0] == "forbid_landscape_changes")
         {
@@ -756,10 +757,10 @@ static int32_t cc_set(InteractiveConsole& console, const arguments_t& argv)
             SET_FLAG(gParkFlags, PARK_FLAGS_PREF_MORE_INTENSE_RIDES, int_val[0]);
             console.Execute("get guest_prefer_more_intense_rides");
         }
-        else if (argv[0] == "forbid_marketing_campagns" && invalidArguments(&invalidArgs, int_valid[0]))
+        else if (argv[0] == "forbid_marketing_campaigns" && invalidArguments(&invalidArgs, int_valid[0]))
         {
             SET_FLAG(gParkFlags, PARK_FLAGS_FORBID_MARKETING_CAMPAIGN, int_val[0]);
-            console.Execute("get forbid_marketing_campagns");
+            console.Execute("get forbid_marketing_campaigns");
         }
         else if (argv[0] == "forbid_landscape_changes" && invalidArguments(&invalidArgs, int_valid[0]))
         {
@@ -1541,7 +1542,7 @@ static constexpr const utf8* console_variable_table[] = {
     "guest_initial_thirst",
     "guest_prefer_less_intense_rides",
     "guest_prefer_more_intense_rides",
-    "forbid_marketing_campagn",
+    "forbid_marketing_campaigns",
     "forbid_landscape_changes",
     "forbid_tree_removal",
     "forbid_high_construction",

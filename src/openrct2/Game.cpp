@@ -88,9 +88,9 @@ GAME_COMMAND_CALLBACK_POINTER * game_command_callback = nullptr;
 static GAME_COMMAND_CALLBACK_POINTER * const game_command_callback_table[] = {
     nullptr,
     nullptr,
-    game_command_callback_ride_construct_placed_front,
-    game_command_callback_ride_construct_placed_back,
-    game_command_callback_ride_remove_track_piece,
+    nullptr,
+    nullptr,
+    nullptr,
     game_command_callback_place_banner,
     game_command_callback_place_ride_entrance_or_exit,
     game_command_callback_hire_new_staff_member,
@@ -332,17 +332,16 @@ void update_palette_effects()
  *
  * @param cost (ebp)
  */
-static int32_t game_check_affordability(int32_t cost)
+static int32_t game_check_affordability(int32_t cost, uint32_t flags)
 {
-    if (cost <= 0)
-        return cost;
+    // Only checked for game commands.
     if (gUnk141F568 & 0xF0)
         return cost;
-    if (cost <= gCash)
+
+    if (finance_check_affordability(cost, flags))
         return cost;
 
     set_format_arg(0, uint32_t, cost);
-
     gGameCommandErrorText = STR_NOT_ENOUGH_CASH_REQUIRES;
     return MONEY32_UNDEFINED;
 }
@@ -447,7 +446,7 @@ int32_t game_do_command_p(
         // Check funds
         int32_t insufficientFunds = 0;
         if (gGameCommandNestLevel == 1 && !(flags & GAME_COMMAND_FLAG_2) && !(flags & GAME_COMMAND_FLAG_5) && cost != 0)
-            insufficientFunds = game_check_affordability(cost);
+            insufficientFunds = game_check_affordability(cost, flags);
 
         if (insufficientFunds != MONEY32_UNDEFINED)
         {
@@ -531,8 +530,8 @@ int32_t game_do_command_p(
             if (gGameCommandNestLevel != 0)
                 return cost;
 
-            //
-            if (!(flags & 0x20))
+            // Check if money is required.
+            if (finance_check_money_required(flags))
             {
                 // Update money balance
                 finance_payment(cost, gCommandExpenditureType);
@@ -601,21 +600,6 @@ void game_log_multiplayer_command(int command, const int* eax, const int* ebx, c
         format_string(log_msg, 256, STR_LOG_CHEAT_USED, args);
         network_append_server_log(log_msg);
     }
-    else if (command == GAME_COMMAND_CREATE_RIDE && *ebp == 1)
-    { // ebp is 1 if the command comes from ride_create method in ride.c, other calls send ride_entry instead of ride and wont
-      // work
-        // Get ride name
-        Ride* ride = get_ride(*edx);
-        char ride_name[128];
-        format_string(ride_name, 128, ride->name, &ride->name_arguments);
-
-        char* args[2] = {
-            (char*)player_name,
-            ride_name,
-        };
-        format_string(log_msg, 256, STR_LOG_CREATE_RIDE, args);
-        network_append_server_log(log_msg);
-    }
     else if (command == GAME_COMMAND_DEMOLISH_RIDE && (*ebp == 1 || *ebp == 0))
     { // ebp is 1 if command comes from ride window prompt, so we don't log "demolishing" ride previews
         // Get ride name
@@ -630,9 +614,7 @@ void game_log_multiplayer_command(int command, const int* eax, const int* ebx, c
         format_string(log_msg, 256, STR_LOG_DEMOLISH_RIDE, args);
         network_append_server_log(log_msg);
     }
-    else if (
-        command == GAME_COMMAND_SET_RIDE_APPEARANCE || command == GAME_COMMAND_SET_RIDE_VEHICLES
-        || command == GAME_COMMAND_SET_RIDE_SETTING)
+    else if (command == GAME_COMMAND_SET_RIDE_VEHICLES || command == GAME_COMMAND_SET_RIDE_SETTING)
     {
         // Get ride name
         int ride_index = *edx & 0xFF;
@@ -660,66 +642,6 @@ void game_log_multiplayer_command(int command, const int* eax, const int* ebx, c
 
         network_append_server_log(log_msg);
     }
-    else if (command == GAME_COMMAND_SET_RIDE_STATUS)
-    {
-        // Get ride name
-        int ride_index = *edx & 0xFF;
-        Ride* ride = get_ride(ride_index);
-        char ride_name[128];
-        format_string(ride_name, 128, ride->name, &ride->name_arguments);
-
-        char* args[2] = {
-            (char*)player_name,
-            ride_name,
-        };
-
-        int status = *edx >> 8;
-        switch (status)
-        {
-            case 0:
-                format_string(log_msg, 256, STR_LOG_RIDE_STATUS_CLOSED, args);
-                break;
-            case 1:
-                format_string(log_msg, 256, STR_LOG_RIDE_STATUS_OPEN, args);
-                break;
-            case 2:
-                format_string(log_msg, 256, STR_LOG_RIDE_STATUS_TESTING, args);
-                break;
-        }
-
-        network_append_server_log(log_msg);
-    }
-    else if (command == GAME_COMMAND_SET_RIDE_PRICE)
-    {
-        // Get ride name
-        int ride_index = *edx & 0xFF;
-        Ride* ride = get_ride(ride_index);
-        char ride_name[128];
-        format_string(ride_name, 128, ride->name, &ride->name_arguments);
-
-        // Format price
-        int price_args[1] = { *edi };
-        char price_str[16];
-        format_string(price_str, 16, STR_BOTTOM_TOOLBAR_CASH, price_args);
-
-        // Log change in primary or secondary price
-        char* args[3] = {
-            (char*)player_name,
-            ride_name,
-            price_str,
-        };
-
-        if (*edx >> 8 == 0)
-        {
-            format_string(log_msg, 256, STR_LOG_RIDE_PRICE, args);
-        }
-        else if (*edx >> 8 == 1)
-        {
-            format_string(log_msg, 256, STR_LOG_RIDE_SECONDARY_PRICE, args);
-        }
-
-        network_append_server_log(log_msg);
-    }
     else if (command == GAME_COMMAND_SET_PARK_OPEN)
     {
         // Log change in park open/close
@@ -736,22 +658,6 @@ void game_log_multiplayer_command(int command, const int* eax, const int* ebx, c
             format_string(log_msg, 256, STR_LOG_PARK_CLOSED, args);
         }
 
-        network_append_server_log(log_msg);
-    }
-    else if (command == GAME_COMMAND_SET_PARK_ENTRANCE_FEE)
-    {
-        // Format price
-        int price_args[1] = { *edi };
-        char price_str[16];
-        format_string(price_str, 16, STR_BOTTOM_TOOLBAR_CASH, price_args);
-
-        // Log change in park entrance fee
-        char* args[2] = {
-            (char*)player_name,
-            price_str,
-        };
-
-        format_string(log_msg, 256, STR_LOG_PARK_ENTRANCE_FEE, args);
         network_append_server_log(log_msg);
     }
     else if (
@@ -773,9 +679,7 @@ void game_log_multiplayer_command(int command, const int* eax, const int* ebx, c
         format_string(log_msg, 256, STR_LOG_PLACE_SCENERY, args);
         network_append_server_log(log_msg);
     }
-    else if (
-        command == GAME_COMMAND_REMOVE_SCENERY || command == GAME_COMMAND_REMOVE_WALL
-        || command == GAME_COMMAND_REMOVE_LARGE_SCENERY || command == GAME_COMMAND_REMOVE_BANNER)
+    else if (command == GAME_COMMAND_REMOVE_BANNER)
     {
         uint8_t flags = *ebx & 0xFF;
         if (flags & GAME_COMMAND_FLAG_GHOST)
@@ -794,8 +698,7 @@ void game_log_multiplayer_command(int command, const int* eax, const int* ebx, c
     else if (
         command == GAME_COMMAND_SET_SCENERY_COLOUR || command == GAME_COMMAND_SET_WALL_COLOUR
         || command == GAME_COMMAND_SET_LARGE_SCENERY_COLOUR || command == GAME_COMMAND_SET_BANNER_COLOUR
-        || command == GAME_COMMAND_SET_BANNER_NAME || command == GAME_COMMAND_SET_SIGN_NAME
-        || command == GAME_COMMAND_SET_BANNER_STYLE || command == GAME_COMMAND_SET_SIGN_STYLE)
+        || command == GAME_COMMAND_SET_BANNER_STYLE)
     {
         // Log editing scenery
         char* args[1] = {
@@ -828,37 +731,6 @@ void game_log_multiplayer_command(int command, const int* eax, const int* ebx, c
             network_append_server_log(log_msg);
         }
     }
-    else if (command == GAME_COMMAND_PLACE_TRACK)
-    {
-        // Get ride name
-        int ride_index = *edx & 0xFF;
-        Ride* ride = get_ride(ride_index);
-        char ride_name[128];
-        format_string(ride_name, 128, ride->name, &ride->name_arguments);
-
-        char* args[2] = {
-            (char*)player_name,
-            ride_name,
-        };
-        format_string(log_msg, 256, STR_LOG_PLACE_TRACK, args);
-        network_append_server_log(log_msg);
-    }
-    else if (command == GAME_COMMAND_REMOVE_TRACK)
-    {
-        char* args[1] = {
-            (char*)player_name,
-        };
-        format_string(log_msg, 256, STR_LOG_REMOVE_TRACK, args);
-        network_append_server_log(log_msg);
-    }
-    else if (command == GAME_COMMAND_PLACE_PEEP_SPAWN)
-    {
-        char* args[1] = {
-            (char*)player_name,
-        };
-        format_string(log_msg, 256, STR_LOG_PLACE_PEEP_SPAWN, args);
-        network_append_server_log(log_msg);
-    }
 }
 
 void pause_toggle()
@@ -879,20 +751,6 @@ bool game_is_paused()
 bool game_is_not_paused()
 {
     return gGamePaused == 0;
-}
-
-/**
- *
- *  rct2: 0x00667C15
- */
-void game_pause_toggle(
-    [[maybe_unused]] int32_t* eax, int32_t* ebx, [[maybe_unused]] int32_t* ecx, [[maybe_unused]] int32_t* edx,
-    [[maybe_unused]] int32_t* esi, [[maybe_unused]] int32_t* edi, [[maybe_unused]] int32_t* ebp)
-{
-    if (*ebx & GAME_COMMAND_FLAG_APPLY)
-        pause_toggle();
-
-    *ebx = 0;
 }
 
 /**
@@ -1454,11 +1312,11 @@ void game_load_or_quit_no_save_prompt()
 }
 
 GAME_COMMAND_POINTER* new_game_command_table[GAME_COMMAND_COUNT] = {
-    game_command_set_ride_appearance,
-    game_command_set_land_height,
-    game_pause_toggle,
-    game_command_place_track,
-    game_command_remove_track,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
     game_load_or_quit,
     game_command_create_ride,
     game_command_demolish_ride,
@@ -1475,7 +1333,7 @@ GAME_COMMAND_POINTER* new_game_command_table[GAME_COMMAND_COUNT] = {
     game_command_place_footpath_from_track,
     nullptr,
     game_command_change_surface_style,
-    game_command_set_ride_price,
+    nullptr,
     game_command_set_guest_name,
     game_command_set_staff_name,
     game_command_raise_land,
@@ -1487,7 +1345,7 @@ GAME_COMMAND_POINTER* new_game_command_table[GAME_COMMAND_COUNT] = {
     game_command_hire_new_staff_member,
     game_command_set_staff_patrol,
     game_command_fire_staff_member,
-    game_command_set_staff_order,
+    nullptr,
     nullptr,
     game_command_set_park_open,
     game_command_buy_land_rights,
@@ -1516,7 +1374,7 @@ GAME_COMMAND_POINTER* new_game_command_table[GAME_COMMAND_COUNT] = {
     nullptr,
     nullptr,
     game_command_set_banner_style,
-    game_command_set_sign_style,
+    nullptr,
     game_command_set_player_group,
     game_command_modify_groups,
     game_command_kick_player,

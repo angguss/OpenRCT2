@@ -15,6 +15,7 @@
 #include "../Game.h"
 #include "../Input.h"
 #include "../OpenRCT2.h"
+#include "../actions/TrackRemoveAction.hpp"
 #include "../audio/AudioMixer.h"
 #include "../audio/audio.h"
 #include "../common.h"
@@ -151,11 +152,6 @@ rct_ride_measurement gRideMeasurements[MAX_RIDE_MEASUREMENTS];
 
 uint16_t gRideCount;
 bool gGotoStartPlacementMode = false;
-int32_t gRideRemoveTrackPieceCallbackX;
-int32_t gRideRemoveTrackPieceCallbackY;
-int32_t gRideRemoveTrackPieceCallbackZ;
-int32_t gRideRemoveTrackPieceCallbackDirection;
-int32_t gRideRemoveTrackPieceCallbackType;
 
 money16 gTotalRideValueForMoney;
 
@@ -165,8 +161,6 @@ uint16_t _numCurrentPossibleRideConfigurations;
 uint16_t _numCurrentPossibleSpecialTrackPieces;
 
 uint16_t _currentTrackCurve;
-uint16_t _currentTrackEndX;
-uint16_t _currentTrackEndY;
 uint8_t _rideConstructionState;
 ride_id_t _currentRideIndex;
 uint16_t _currentTrackBeginX;
@@ -220,7 +214,6 @@ static void ride_music_update(Ride* ride);
 static void ride_shop_connected(Ride* ride);
 static void ride_spiral_slide_update(Ride* ride);
 static void ride_update(Ride* ride);
-static void ride_update_vehicle_colours(Ride* ride);
 void loc_6DDF9C(Ride* ride, TileElement* tileElement);
 
 Ride* get_ride(int32_t index)
@@ -486,7 +479,7 @@ static money32 ride_calculate_income_per_hour(Ride* ride)
  * dl ride index
  * esi result map element
  */
-bool ride_try_get_origin_element(ride_id_t rideIndex, CoordsXYE* output)
+bool ride_try_get_origin_element(const Ride* ride, CoordsXYE* output)
 {
     TileElement* resultTileElement = nullptr;
 
@@ -496,7 +489,7 @@ bool ride_try_get_origin_element(ride_id_t rideIndex, CoordsXYE* output)
     {
         if (it.element->GetType() != TILE_ELEMENT_TYPE_TRACK)
             continue;
-        if (rideIndex != it.element->AsTrack()->GetRideIndex())
+        if (it.element->AsTrack()->GetRideIndex() != ride->id)
             continue;
 
         // Found a track piece for target ride
@@ -538,11 +531,9 @@ bool ride_try_get_origin_element(ride_id_t rideIndex, CoordsXYE* output)
  * on the first element of a track block
  */
 bool track_block_get_next_from_zero(
-    int16_t x, int16_t y, int16_t z_start, ride_id_t rideIndex, uint8_t direction_start, CoordsXYE* output, int32_t* z,
+    int16_t x, int16_t y, int16_t z_start, Ride* ride, uint8_t direction_start, CoordsXYE* output, int32_t* z,
     int32_t* direction, bool isGhost)
 {
-    Ride* ride = get_ride(rideIndex);
-
     if (!(direction_start & (1 << 2)))
     {
         x += CoordsDirectionDelta[direction_start].x;
@@ -562,7 +553,7 @@ bool track_block_get_next_from_zero(
         if (tileElement->GetType() != TILE_ELEMENT_TYPE_TRACK)
             continue;
 
-        if (tileElement->AsTrack()->GetRideIndex() != rideIndex)
+        if (tileElement->AsTrack()->GetRideIndex() != ride->id)
             continue;
 
         if (tileElement->AsTrack()->GetSequenceIndex() != 0)
@@ -659,7 +650,7 @@ bool track_block_get_next(CoordsXYE* input, CoordsXYE* output, int32_t* z, int32
     uint8_t directionStart = ((trackCoordinate->rotation_end + rotation) & TILE_ELEMENT_DIRECTION_MASK)
         | (trackCoordinate->rotation_end & (1 << 2));
 
-    return track_block_get_next_from_zero(x, y, OriginZ, rideIndex, directionStart, output, z, direction, false);
+    return track_block_get_next_from_zero(x, y, OriginZ, ride, directionStart, output, z, direction, false);
 }
 
 /**
@@ -671,10 +662,8 @@ bool track_block_get_next(CoordsXYE* input, CoordsXYE* output, int32_t* z, int32
  *  rct2: 0x006C63D6
  */
 bool track_block_get_previous_from_zero(
-    int16_t x, int16_t y, int16_t z, ride_id_t rideIndex, uint8_t direction, track_begin_end* outTrackBeginEnd)
+    int16_t x, int16_t y, int16_t z, Ride* ride, uint8_t direction, track_begin_end* outTrackBeginEnd)
 {
-    Ride* ride = get_ride(rideIndex);
-
     uint8_t directionStart = direction;
     direction = direction_reverse(direction);
 
@@ -699,7 +688,7 @@ bool track_block_get_previous_from_zero(
         if (tileElement->GetType() != TILE_ELEMENT_TYPE_TRACK)
             continue;
 
-        if (tileElement->AsTrack()->GetRideIndex() != rideIndex)
+        if (tileElement->AsTrack()->GetRideIndex() != ride->id)
             continue;
 
         const rct_preview_track* nextTrackBlock = get_track_def_from_ride(ride, tileElement->AsTrack()->GetTrackType());
@@ -812,7 +801,7 @@ bool track_block_get_previous(int32_t x, int32_t y, TileElement* tileElement, tr
     rotation = ((trackCoordinate->rotation_begin + rotation) & TILE_ELEMENT_DIRECTION_MASK)
         | (trackCoordinate->rotation_begin & (1 << 2));
 
-    return track_block_get_previous_from_zero(x, y, z, rideIndex, rotation, outTrackBeginEnd);
+    return track_block_get_previous_from_zero(x, y, z, ride, rotation, outTrackBeginEnd);
 }
 
 /**
@@ -823,14 +812,12 @@ bool track_block_get_previous(int32_t x, int32_t y, TileElement* tileElement, tr
  * bx result y
  * esi input / output map element
  */
-int32_t ride_find_track_gap(ride_id_t rideIndex, CoordsXYE* input, CoordsXYE* output)
+int32_t ride_find_track_gap(const Ride* ride, CoordsXYE* input, CoordsXYE* output)
 {
     assert(input->element->GetType() == TILE_ELEMENT_TYPE_TRACK);
-
-    Ride* ride = get_ride(rideIndex);
     if (ride == nullptr)
     {
-        log_error("Trying to access invalid ride %d", rideIndex);
+        log_error("Trying to access invalid ride %d", ride->id);
         return 0;
     }
 
@@ -840,7 +827,7 @@ int32_t ride_find_track_gap(ride_id_t rideIndex, CoordsXYE* input, CoordsXYE* ou
     }
 
     rct_window* w = window_find_by_class(WC_RIDE_CONSTRUCTION);
-    if (w != nullptr && _rideConstructionState != RIDE_CONSTRUCTION_STATE_0 && _currentRideIndex == rideIndex)
+    if (w != nullptr && _rideConstructionState != RIDE_CONSTRUCTION_STATE_0 && _currentRideIndex == ride->id)
     {
         ride_construction_invalidate_current_track();
     }
@@ -881,10 +868,8 @@ int32_t ride_find_track_gap(ride_id_t rideIndex, CoordsXYE* input, CoordsXYE* ou
  *
  *  rct2: 0x006AF561
  */
-void ride_get_status(ride_id_t rideIndex, rct_string_id* formatSecondary, int32_t* argument)
+void ride_get_status(const Ride* ride, rct_string_id* formatSecondary, int32_t* argument)
 {
-    Ride* ride = get_ride(rideIndex);
-
     if (ride->lifecycle_flags & RIDE_LIFECYCLE_CRASHED)
     {
         *formatSecondary = STR_CRASHED;
@@ -1066,13 +1051,12 @@ static rct_window* ride_create_or_find_construction_window(ride_id_t rideIndex)
  *
  *  rct2: 0x006B4857
  */
-void ride_construct(ride_id_t rideIndex)
+void ride_construct(Ride* ride)
 {
     CoordsXYE trackElement;
-
-    if (ride_try_get_origin_element(rideIndex, &trackElement))
+    if (ride_try_get_origin_element(ride, &trackElement))
     {
-        ride_find_track_gap(rideIndex, &trackElement, &trackElement);
+        ride_find_track_gap(ride, &trackElement, &trackElement);
 
         rct_window* w = window_get_main();
         if (w != nullptr && ride_modify(&trackElement))
@@ -1080,7 +1064,7 @@ void ride_construct(ride_id_t rideIndex)
     }
     else
     {
-        ride_initialise_construction_window(rideIndex);
+        ride_initialise_construction_window(ride);
     }
 }
 
@@ -1482,15 +1466,15 @@ void ride_remove_provisional_track_piece()
             y -= CoordsDirectionDelta[direction].y;
         }
         CoordsXYE next_track;
-        if (track_block_get_next_from_zero(x, y, z, rideIndex, direction, &next_track, &z, &direction, true))
+        if (track_block_get_next_from_zero(x, y, z, ride, direction, &next_track, &z, &direction, true))
         {
-            int32_t flags = GAME_COMMAND_FLAG_APPLY | GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_5
-                | GAME_COMMAND_FLAG_GHOST;
             uint8_t trackType = next_track.element->AsTrack()->GetTrackType();
             int32_t trackSequence = next_track.element->AsTrack()->GetSequenceIndex();
-            game_do_command(
-                next_track.x, flags | ((direction & 3) << 8), next_track.y, trackType | (trackSequence << 8),
-                GAME_COMMAND_REMOVE_TRACK, z, 0);
+            auto trackRemoveAction = TrackRemoveAction{ trackType,
+                                                        trackSequence,
+                                                        { next_track.x, next_track.y, z, static_cast<Direction>(direction) } };
+            trackRemoveAction.SetFlags(GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_5 | GAME_COMMAND_FLAG_GHOST);
+            GameActions::Execute(&trackRemoveAction);
         }
     }
 }
@@ -1603,7 +1587,7 @@ void ride_construction_set_default_next_piece()
             y = _currentTrackBeginY;
             z = _currentTrackBeginZ;
             direction = _currentTrackPieceDirection;
-            if (!track_block_get_previous_from_zero(x, y, z, rideIndex, direction, &trackBeginEnd))
+            if (!track_block_get_previous_from_zero(x, y, z, ride, direction, &trackBeginEnd))
             {
                 ride_construction_reset_current_piece();
                 return;
@@ -1676,7 +1660,7 @@ void ride_construction_set_default_next_piece()
             y = _currentTrackBeginY;
             z = _currentTrackBeginZ;
             direction = direction_reverse(_currentTrackPieceDirection);
-            if (!track_block_get_next_from_zero(x, y, z, rideIndex, direction, &xyElement, &z, &direction, false))
+            if (!track_block_get_next_from_zero(x, y, z, ride, direction, &xyElement, &z, &direction, false))
             {
                 ride_construction_reset_current_piece();
                 return;
@@ -1888,6 +1872,7 @@ static int32_t ride_modify_entrance_or_exit(TileElement* tileElement, int32_t x,
     rct_window* constructionWindow;
 
     ride_id_t rideIndex = tileElement->AsEntrance()->GetRideIndex();
+    auto ride = get_ride(rideIndex);
 
     entranceType = tileElement->AsEntrance()->GetEntranceType();
     if (entranceType != ENTRANCE_TYPE_RIDE_ENTRANCE && entranceType != ENTRANCE_TYPE_RIDE_EXIT)
@@ -1899,7 +1884,7 @@ static int32_t ride_modify_entrance_or_exit(TileElement* tileElement, int32_t x,
     constructionWindow = window_find_by_class(WC_RIDE_CONSTRUCTION);
     if (constructionWindow == nullptr)
     {
-        if (!ride_initialise_construction_window(rideIndex))
+        if (!ride_initialise_construction_window(ride))
             return 0;
 
         constructionWindow = window_find_by_class(WC_RIDE_CONSTRUCTION);
@@ -1997,7 +1982,7 @@ int32_t ride_modify(CoordsXYE* input)
     }
 
     // Stop the ride again to clear all vehicles and peeps (compatible with network games)
-    ride_set_status(rideIndex, RIDE_STATUS_CLOSED);
+    ride_set_status(ride, RIDE_STATUS_CLOSED);
 
     // Check if element is a station entrance or exit
     if (tileElement.element->GetType() == TILE_ELEMENT_TYPE_ENTRANCE)
@@ -2010,7 +1995,7 @@ int32_t ride_modify(CoordsXYE* input)
 
     if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_CANNOT_HAVE_GAPS))
     {
-        if (ride_find_track_gap(rideIndex, &tileElement, &endOfTrackElement))
+        if (ride_find_track_gap(ride, &tileElement, &endOfTrackElement))
             tileElement = endOfTrackElement;
     }
 
@@ -2077,13 +2062,11 @@ int32_t ride_modify(CoordsXYE* input)
  *
  *  rct2: 0x006CC3FB
  */
-int32_t ride_initialise_construction_window(ride_id_t rideIndex)
+int32_t ride_initialise_construction_window(Ride* ride)
 {
-    Ride* ride;
     rct_window* w;
 
     tool_cancel();
-    ride = get_ride(rideIndex);
 
     if (!ride_check_if_construction_allowed(ride))
         return 0;
@@ -2091,7 +2074,7 @@ int32_t ride_initialise_construction_window(ride_id_t rideIndex)
     ride_clear_for_construction(ride);
     ride_remove_peeps(ride);
 
-    w = ride_create_or_find_construction_window(rideIndex);
+    w = ride_create_or_find_construction_window(ride->id);
 
     tool_set(w, WC_RIDE_CONSTRUCTION__WIDX_CONSTRUCT, TOOL_CROSSHAIR);
     input_set_flag(INPUT_FLAG_6, true);
@@ -2218,9 +2201,9 @@ static void ride_update(Ride* ride)
 
             if (vehicle->status == VEHICLE_STATUS_CRASHED || vehicle->status == VEHICLE_STATUS_CRASHING)
             {
-                ride_set_status(ride->id, RIDE_STATUS_CLOSED);
-                ride_set_status(ride->id, RIDE_STATUS_CLOSED);
-                ride_set_status(ride->id, RIDE_STATUS_TESTING);
+                ride_set_status(ride, RIDE_STATUS_CLOSED);
+                ride_set_status(ride, RIDE_STATUS_CLOSED);
+                ride_set_status(ride, RIDE_STATUS_TESTING);
                 break;
             }
         }
@@ -2511,7 +2494,7 @@ static void ride_breakdown_update(Ride* ride)
     {
         int32_t breakdownReason = ride_get_new_breakdown_problem(ride);
         if (breakdownReason != -1)
-            ride_prepare_breakdown(ride->id, breakdownReason);
+            ride_prepare_breakdown(ride, breakdownReason);
     }
 }
 
@@ -2612,14 +2595,12 @@ static void choose_random_train_to_breakdown_safe(Ride* ride)
  *
  *  rct2: 0x006B7348
  */
-void ride_prepare_breakdown(ride_id_t rideIndex, int32_t breakdownReason)
+void ride_prepare_breakdown(Ride* ride, int32_t breakdownReason)
 {
     int32_t i;
     uint16_t vehicleSpriteIdx;
-    Ride* ride;
     rct_vehicle* vehicle;
 
-    ride = get_ride(rideIndex);
     if (ride->lifecycle_flags & (RIDE_LIFECYCLE_BREAKDOWN_PENDING | RIDE_LIFECYCLE_BROKEN_DOWN | RIDE_LIFECYCLE_CRASHED))
         return;
 
@@ -2699,15 +2680,13 @@ void ride_prepare_breakdown(ride_id_t rideIndex, int32_t breakdownReason)
  *
  *  rct2: 0x006B74FA
  */
-void ride_breakdown_add_news_item(ride_id_t rideIndex)
+void ride_breakdown_add_news_item(Ride* ride)
 {
-    Ride* ride = get_ride(rideIndex);
-
     set_format_arg(0, rct_string_id, ride->name);
     set_format_arg(2, uint32_t, ride->name_arguments);
     if (gConfigNotifications.ride_broken_down)
     {
-        news_item_add_to_queue(NEWS_ITEM_RIDE, STR_RIDE_IS_BROKEN_DOWN, rideIndex);
+        news_item_add_to_queue(NEWS_ITEM_RIDE, STR_RIDE_IS_BROKEN_DOWN, ride->id);
     }
 }
 
@@ -2763,7 +2742,7 @@ static void ride_mechanic_status_update(Ride* ride, int32_t mechanicStatus)
             ride->window_invalidate_flags |= RIDE_INVALIDATE_RIDE_MAINTENANCE | RIDE_INVALIDATE_RIDE_LIST
                 | RIDE_INVALIDATE_RIDE_MAIN;
             ride->breakdown_reason = breakdownReason;
-            ride_breakdown_add_news_item(ride->id);
+            ride_breakdown_add_news_item(ride);
         }
     }
     switch (mechanicStatus)
@@ -3037,7 +3016,7 @@ static void ride_music_update(Ride* ride)
         sampleRate += 22050;
     }
 
-    ride->music_position = ride_music_params_update(x, y, z, ride->id, sampleRate, ride->music_position, &ride->music_tune_id);
+    ride->music_position = ride_music_params_update(x, y, z, ride, sampleRate, ride->music_position, &ride->music_tune_id);
 }
 
 #pragma endregion
@@ -3215,10 +3194,8 @@ static int32_t ride_get_free_measurement()
  *
  *  rct2: 0x006B66D9
  */
-rct_ride_measurement* ride_get_measurement(ride_id_t rideIndex, rct_string_id* message)
+rct_ride_measurement* ride_get_measurement(Ride* ride, rct_string_id* message)
 {
-    Ride* ride = get_ride(rideIndex);
-
     // Check if ride type supports data logging
     if (!ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_HAS_DATA_LOGGING))
     {
@@ -3228,7 +3205,7 @@ rct_ride_measurement* ride_get_measurement(ride_id_t rideIndex, rct_string_id* m
     }
 
     // Check if a measurement already exists for this ride
-    rct_ride_measurement* measurement = ride_get_existing_measurement(rideIndex);
+    rct_ride_measurement* measurement = ride_get_existing_measurement(ride->id);
     if (measurement == nullptr)
     {
         // Find a free measurement
@@ -3258,7 +3235,7 @@ rct_ride_measurement* ride_get_measurement(ride_id_t rideIndex, rct_string_id* m
             measurement = get_ride_measurement(i);
         }
 
-        measurement->ride_index = rideIndex;
+        measurement->ride_index = ride->id;
         ride->measurement_index = i;
         measurement->flags = 0;
         if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_HAS_G_FORCES))
@@ -3451,8 +3428,8 @@ static void ride_entrance_exit_connected(Ride* ride)
     for (int32_t i = 0; i < MAX_STATIONS; ++i)
     {
         LocationXY8 station_start = ride->stations[i].Start;
-        TileCoordsXYZD entrance = ride_get_entrance_location(ride->id, i);
-        TileCoordsXYZD exit = ride_get_exit_location(ride->id, i);
+        auto entrance = ride_get_entrance_location(ride, i);
+        auto exit = ride_get_exit_location(ride, i);
 
         if (station_start.xy == RCT_XY8_UNDEFINED)
             continue;
@@ -3574,7 +3551,7 @@ static void ride_track_set_map_tooltip(TileElement* tileElement)
 
     rct_string_id formatSecondary;
     int32_t arg1 = 0;
-    ride_get_status(rideIndex, &formatSecondary, &arg1);
+    ride_get_status(ride, &formatSecondary, &arg1);
     set_map_tooltip_format_arg(8, rct_string_id, formatSecondary);
     set_map_tooltip_format_arg(10, uint32_t, arg1);
 }
@@ -3590,7 +3567,7 @@ static void ride_queue_banner_set_map_tooltip(TileElement* tileElement)
 
     rct_string_id formatSecondary;
     int32_t arg1 = 0;
-    ride_get_status(rideIndex, &formatSecondary, &arg1);
+    ride_get_status(ride, &formatSecondary, &arg1);
     set_map_tooltip_format_arg(8, rct_string_id, formatSecondary);
     set_map_tooltip_format_arg(10, uint32_t, arg1);
 }
@@ -3613,7 +3590,7 @@ static void ride_station_set_map_tooltip(TileElement* tileElement)
 
     rct_string_id formatSecondary;
     int32_t arg1;
-    ride_get_status(rideIndex, &formatSecondary, &arg1);
+    ride_get_status(ride, &formatSecondary, &arg1);
     set_map_tooltip_format_arg(14, rct_string_id, formatSecondary);
     set_map_tooltip_format_arg(16, uint32_t, arg1);
 }
@@ -3694,14 +3671,14 @@ void ride_set_map_tooltip(TileElement* tileElement)
 }
 
 static int32_t ride_music_params_update_label_51(
-    uint32_t a1, uint8_t* tuneId, ride_id_t rideIndex, int32_t v32, int32_t pan_x, uint16_t sampleRate)
+    uint32_t a1, uint8_t* tuneId, Ride* ride, int32_t v32, int32_t pan_x, uint16_t sampleRate)
 {
     if (a1 < gRideMusicInfoList[*tuneId].length)
     {
         rct_ride_music_params* ride_music_params = gRideMusicParamsListEnd;
         if (ride_music_params < &gRideMusicParamsList[std::size(gRideMusicParamsList)])
         {
-            ride_music_params->ride_id = rideIndex;
+            ride_music_params->ride_id = ride->id;
             ride_music_params->tune_id = *tuneId;
             ride_music_params->offset = a1;
             ride_music_params->volume = v32;
@@ -3748,7 +3725,7 @@ static int32_t ride_music_params_update_label_58(uint32_t position, uint8_t* tun
  * @returns new position (ebp)
  */
 int32_t ride_music_params_update(
-    int16_t x, int16_t y, int16_t z, ride_id_t rideIndex, uint16_t sampleRate, uint32_t position, uint8_t* tuneId)
+    int16_t x, int16_t y, int16_t z, Ride* ride, uint16_t sampleRate, uint32_t position, uint8_t* tuneId)
 {
     if (!(gScreenFlags & SCREEN_FLAGS_SCENARIO_EDITOR) && !gGameSoundsOff && g_music_tracking_viewport != nullptr)
     {
@@ -3851,7 +3828,7 @@ int32_t ride_music_params_update(
             rct_ride_music* ride_music = &gRideMusicList[0];
             int32_t channel = 0;
             uint32_t a1;
-            while (ride_music->ride_id != rideIndex || ride_music->tune_id != *tuneId)
+            while (ride_music->ride_id != ride->id || ride_music->tune_id != *tuneId)
             {
                 ride_music++;
                 channel++;
@@ -3860,7 +3837,7 @@ int32_t ride_music_params_update(
                     rct_ride_music_info* ride_music_info = &gRideMusicInfoList[*tuneId];
                     a1 = position + ride_music_info->offset;
 
-                    return ride_music_params_update_label_51(a1, tuneId, rideIndex, v32, pan_x, sampleRate);
+                    return ride_music_params_update_label_51(a1, tuneId, ride, v32, pan_x, sampleRate);
                 }
             }
             int32_t playing = Mixer_Channel_IsPlaying(gRideMusicList[channel].sound_channel);
@@ -3871,7 +3848,7 @@ int32_t ride_music_params_update(
             }
             a1 = (uint32_t)Mixer_Channel_GetOffset(gRideMusicList[channel].sound_channel);
 
-            return ride_music_params_update_label_51(a1, tuneId, rideIndex, v32, pan_x, sampleRate);
+            return ride_music_params_update_label_51(a1, tuneId, ride, v32, pan_x, sampleRate);
         }
         else
         {
@@ -4397,11 +4374,11 @@ static int32_t ride_check_for_entrance_exit(ride_id_t rideIndex)
  *
  *  rct2: 0x006B5952
  */
-static void sub_6B5952(ride_id_t rideIndex)
+static void sub_6B5952(Ride* ride)
 {
     for (int32_t i = 0; i < MAX_STATIONS; i++)
     {
-        TileCoordsXYZD location = ride_get_entrance_location(rideIndex, i);
+        auto location = ride_get_entrance_location(ride, i);
         if (location.isNull())
             continue;
 
@@ -4420,7 +4397,7 @@ static void sub_6B5952(ride_id_t rideIndex)
                 continue;
 
             int32_t direction = tileElement->GetDirection();
-            footpath_chain_ride_queue(rideIndex, i, x, y, tileElement, direction_reverse(direction));
+            footpath_chain_ride_queue(ride->id, i, x, y, tileElement, direction_reverse(direction));
         } while (!(tileElement++)->IsLastForTile());
     }
 }
@@ -5560,10 +5537,8 @@ static bool ride_create_cable_lift(ride_id_t rideIndex, bool isApplying)
  *
  *  rct2: 0x006B51C0
  */
-static void loc_6B51C0(ride_id_t rideIndex)
+static void loc_6B51C0(const Ride* ride)
 {
-    Ride* ride = get_ride(rideIndex);
-
     if (gUnk141F568 != gUnk13CA740)
         return;
 
@@ -5578,13 +5553,13 @@ static void loc_6B51C0(ride_id_t rideIndex)
         if (ride->stations[i].Start.xy == RCT_XY8_UNDEFINED)
             continue;
 
-        if (ride_get_entrance_location(rideIndex, i).isNull())
+        if (ride_get_entrance_location(ride, i).isNull())
         {
             entranceOrExit = 0;
             break;
         }
 
-        if (ride_get_exit_location(rideIndex, i).isNull())
+        if (ride_get_exit_location(ride, i).isNull())
         {
             entranceOrExit = 1;
             break;
@@ -5602,8 +5577,8 @@ static void loc_6B51C0(ride_id_t rideIndex)
         window_scroll_to_location(w, x, y, z);
 
         CoordsXYE trackElement;
-        ride_try_get_origin_element(rideIndex, &trackElement);
-        ride_find_track_gap(rideIndex, &trackElement, &trackElement);
+        ride_try_get_origin_element(ride, &trackElement);
+        ride_find_track_gap(ride, &trackElement, &trackElement);
         int32_t ok = ride_modify(&trackElement);
         if (ok == 0)
         {
@@ -5664,20 +5639,18 @@ static TileElement* loc_6B4F6B(ride_id_t rideIndex, int32_t x, int32_t y)
     return nullptr;
 }
 
-int32_t ride_is_valid_for_test(ride_id_t rideIndex, int32_t goingToBeOpen, int32_t isApplying)
+int32_t ride_is_valid_for_test(Ride* ride, int32_t goingToBeOpen, int32_t isApplying)
 {
     int32_t stationIndex;
-    Ride* ride;
     CoordsXYE trackElement, problematicTrackElement = {};
 
-    ride = get_ride(rideIndex);
     if (ride->type == RIDE_TYPE_NULL)
     {
-        log_warning("Invalid ride type for ride %u", rideIndex);
+        log_warning("Invalid ride type for ride %u", ride->id);
         return 0;
     }
 
-    window_close_by_number(WC_RIDE_CONSTRUCTION, rideIndex);
+    window_close_by_number(WC_RIDE_CONSTRUCTION, ride->id);
 
     stationIndex = ride_mode_check_station_present(ride);
     if (stationIndex == -1)
@@ -5686,22 +5659,22 @@ int32_t ride_is_valid_for_test(ride_id_t rideIndex, int32_t goingToBeOpen, int32
     if (!ride_mode_check_valid_station_numbers(ride))
         return 0;
 
-    if (!ride_check_for_entrance_exit(rideIndex))
+    if (!ride_check_for_entrance_exit(ride->id))
     {
-        loc_6B51C0(rideIndex);
+        loc_6B51C0(ride);
         return 0;
     }
 
     if (goingToBeOpen && isApplying)
     {
-        sub_6B5952(rideIndex);
+        sub_6B5952(ride);
         ride->lifecycle_flags |= RIDE_LIFECYCLE_EVER_BEEN_OPENED;
     }
 
     // z = ride->stations[i].Height * 8;
     trackElement.x = ride->stations[stationIndex].Start.x * 32;
     trackElement.y = ride->stations[stationIndex].Start.y * 32;
-    trackElement.element = loc_6B4F6B(rideIndex, trackElement.x, trackElement.y);
+    trackElement.element = loc_6B4F6B(ride->id, trackElement.x, trackElement.y);
     if (trackElement.element == nullptr)
     {
         // Maze is strange, station start is 0... investigation required
@@ -5712,7 +5685,7 @@ int32_t ride_is_valid_for_test(ride_id_t rideIndex, int32_t goingToBeOpen, int32
     if (ride->type == RIDE_TYPE_AIR_POWERED_VERTICAL_COASTER || ride->mode == RIDE_MODE_CONTINUOUS_CIRCUIT
         || ride->mode == RIDE_MODE_CONTINUOUS_CIRCUIT_BLOCK_SECTIONED || ride->mode == RIDE_MODE_POWERED_LAUNCH_BLOCK_SECTIONED)
     {
-        if (ride_find_track_gap(rideIndex, &trackElement, &problematicTrackElement)
+        if (ride_find_track_gap(ride, &trackElement, &problematicTrackElement)
             && (!gConfigGeneral.test_unfinished_tracks || ride->mode == RIDE_MODE_CONTINUOUS_CIRCUIT_BLOCK_SECTIONED
                 || ride->mode == RIDE_MODE_POWERED_LAUNCH_BLOCK_SECTIONED))
         {
@@ -5756,7 +5729,7 @@ int32_t ride_is_valid_for_test(ride_id_t rideIndex, int32_t goingToBeOpen, int32
 
     if (ride->mode == RIDE_MODE_STATION_TO_STATION)
     {
-        if (!ride_find_track_gap(rideIndex, &trackElement, &problematicTrackElement))
+        if (!ride_find_track_gap(ride, &trackElement, &problematicTrackElement))
         {
             gGameCommandErrorText = STR_RIDE_MUST_START_AND_END_WITH_STATIONS;
             return 0;
@@ -5778,7 +5751,7 @@ int32_t ride_is_valid_for_test(ride_id_t rideIndex, int32_t goingToBeOpen, int32
     }
 
     if (isApplying)
-        ride_set_start_finish_points(rideIndex, &trackElement);
+        ride_set_start_finish_points(ride->id, &trackElement);
 
     if (!ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_NO_VEHICLES) && !(ride->lifecycle_flags & RIDE_LIFECYCLE_ON_TRACK))
     {
@@ -5792,7 +5765,7 @@ int32_t ride_is_valid_for_test(ride_id_t rideIndex, int32_t goingToBeOpen, int32
         && (ride->lifecycle_flags & RIDE_LIFECYCLE_CABLE_LIFT_HILL_COMPONENT_USED)
         && !(ride->lifecycle_flags & RIDE_LIFECYCLE_CABLE_LIFT))
     {
-        if (!ride_create_cable_lift(rideIndex, isApplying))
+        if (!ride_create_cable_lift(ride->id, isApplying))
             return 0;
     }
 
@@ -5802,21 +5775,18 @@ int32_t ride_is_valid_for_test(ride_id_t rideIndex, int32_t goingToBeOpen, int32
  *
  *  rct2: 0x006B4EEA
  */
-int32_t ride_is_valid_for_open(ride_id_t rideIndex, int32_t goingToBeOpen, int32_t isApplying)
+int32_t ride_is_valid_for_open(Ride* ride, int32_t goingToBeOpen, int32_t isApplying)
 {
     int32_t stationIndex;
-    Ride* ride;
     CoordsXYE trackElement, problematicTrackElement = {};
-
-    ride = get_ride(rideIndex);
 
     // Check to see if construction tool is in use. If it is close the construction window
     // to set the track to its final state and clean up ghosts.
     // We can't just call close as it would cause a stack overflow during shop creation
     // with auto open on.
-    if (WC_RIDE_CONSTRUCTION == gCurrentToolWidget.window_classification && rideIndex == gCurrentToolWidget.window_number
+    if (WC_RIDE_CONSTRUCTION == gCurrentToolWidget.window_classification && ride->id == gCurrentToolWidget.window_number
         && (input_test_flag(INPUT_FLAG_TOOL_ACTIVE)))
-        window_close_by_number(WC_RIDE_CONSTRUCTION, rideIndex);
+        window_close_by_number(WC_RIDE_CONSTRUCTION, ride->id);
 
     stationIndex = ride_mode_check_station_present(ride);
     if (stationIndex == -1)
@@ -5825,22 +5795,22 @@ int32_t ride_is_valid_for_open(ride_id_t rideIndex, int32_t goingToBeOpen, int32
     if (!ride_mode_check_valid_station_numbers(ride))
         return 0;
 
-    if (!ride_check_for_entrance_exit(rideIndex))
+    if (!ride_check_for_entrance_exit(ride->id))
     {
-        loc_6B51C0(rideIndex);
+        loc_6B51C0(ride);
         return 0;
     }
 
     if (goingToBeOpen && isApplying)
     {
-        sub_6B5952(rideIndex);
+        sub_6B5952(ride);
         ride->lifecycle_flags |= RIDE_LIFECYCLE_EVER_BEEN_OPENED;
     }
 
     // z = ride->stations[i].Height * 8;
     trackElement.x = ride->stations[stationIndex].Start.x * 32;
     trackElement.y = ride->stations[stationIndex].Start.y * 32;
-    trackElement.element = loc_6B4F6B(rideIndex, trackElement.x, trackElement.y);
+    trackElement.element = loc_6B4F6B(ride->id, trackElement.x, trackElement.y);
     if (trackElement.element == nullptr)
     {
         // Maze is strange, station start is 0... investigation required
@@ -5852,7 +5822,7 @@ int32_t ride_is_valid_for_open(ride_id_t rideIndex, int32_t goingToBeOpen, int32
         || ride->mode == RIDE_MODE_CONTINUOUS_CIRCUIT || ride->mode == RIDE_MODE_CONTINUOUS_CIRCUIT_BLOCK_SECTIONED
         || ride->mode == RIDE_MODE_POWERED_LAUNCH_BLOCK_SECTIONED)
     {
-        if (ride_find_track_gap(rideIndex, &trackElement, &problematicTrackElement))
+        if (ride_find_track_gap(ride, &trackElement, &problematicTrackElement))
         {
             gGameCommandErrorText = STR_TRACK_IS_NOT_A_COMPLETE_CIRCUIT;
             ride_scroll_to_track_error(&problematicTrackElement);
@@ -5894,7 +5864,7 @@ int32_t ride_is_valid_for_open(ride_id_t rideIndex, int32_t goingToBeOpen, int32
 
     if (ride->mode == RIDE_MODE_STATION_TO_STATION)
     {
-        if (!ride_find_track_gap(rideIndex, &trackElement, &problematicTrackElement))
+        if (!ride_find_track_gap(ride, &trackElement, &problematicTrackElement))
         {
             gGameCommandErrorText = STR_RIDE_MUST_START_AND_END_WITH_STATIONS;
             return 0;
@@ -5916,7 +5886,7 @@ int32_t ride_is_valid_for_open(ride_id_t rideIndex, int32_t goingToBeOpen, int32
     }
 
     if (isApplying)
-        ride_set_start_finish_points(rideIndex, &trackElement);
+        ride_set_start_finish_points(ride->id, &trackElement);
 
     if (!ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_NO_VEHICLES) && !(ride->lifecycle_flags & RIDE_LIFECYCLE_ON_TRACK))
     {
@@ -5930,7 +5900,7 @@ int32_t ride_is_valid_for_open(ride_id_t rideIndex, int32_t goingToBeOpen, int32
         && (ride->lifecycle_flags & RIDE_LIFECYCLE_CABLE_LIFT_HILL_COMPONENT_USED)
         && !(ride->lifecycle_flags & RIDE_LIFECYCLE_CABLE_LIFT))
     {
-        if (!ride_create_cable_lift(rideIndex, isApplying))
+        if (!ride_create_cable_lift(ride->id, isApplying))
             return 0;
     }
 
@@ -5983,12 +5953,12 @@ void ride_get_start_of_track(CoordsXYE* output)
  *
  *  rct2: 0x006CB7FB
  */
-int32_t ride_get_refund_price(int32_t ride_id)
+int32_t ride_get_refund_price(const Ride* ride)
 {
     CoordsXYE trackElement;
-    money32 addedcost, cost = 0;
+    money32 cost = 0;
 
-    if (!ride_try_get_origin_element(ride_id, &trackElement))
+    if (!ride_try_get_origin_element(ride, &trackElement))
     {
         return 0; // Ride has no track to refund
     }
@@ -6007,12 +5977,14 @@ int32_t ride_get_refund_price(int32_t ride_id)
 
     do
     {
-        addedcost = game_do_command(
-            trackElement.x, GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | (direction << 8), trackElement.y,
-            trackElement.element->AsTrack()->GetTrackType() | ((trackElement.element->AsTrack()->GetSequenceIndex()) << 8),
-            GAME_COMMAND_REMOVE_TRACK, trackElement.element->base_height * 8, 0);
+        auto trackRemoveAction = TrackRemoveAction(
+            trackElement.element->AsTrack()->GetTrackType(), trackElement.element->AsTrack()->GetSequenceIndex(),
+            { trackElement.x, trackElement.y, trackElement.element->base_height * 8, direction });
+        trackRemoveAction.SetFlags(GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED);
 
-        cost += (addedcost == MONEY32_UNDEFINED) ? 0 : addedcost;
+        auto res = GameActions::Query(&trackRemoveAction);
+
+        cost += res->Cost;
 
         if (!track_block_get_next(&trackElement, &trackElement, nullptr, nullptr))
         {
@@ -6039,7 +6011,7 @@ int32_t ride_get_refund_price(int32_t ride_id)
  *
  *  rct2: 0x00696707
  */
-void ride_stop_peeps_queuing(ride_id_t rideIndex)
+void ride_stop_peeps_queuing(Ride* ride)
 {
     uint16_t spriteIndex;
     rct_peep* peep;
@@ -6048,7 +6020,7 @@ void ride_stop_peeps_queuing(ride_id_t rideIndex)
     {
         if (peep->state != PEEP_STATE_QUEUING)
             continue;
-        if (peep->current_ride != rideIndex)
+        if (peep->current_ride != ride->id)
             continue;
 
         peep->RemoveFromQueue();
@@ -6118,7 +6090,7 @@ static bool ride_name_exists(char* name)
     FOR_ALL_RIDES (i, ride)
     {
         format_string(buffer, 256, ride->name, &ride->name_arguments);
-        if ((strcmp(buffer, name) == 0) && ride_has_any_track_elements(i))
+        if ((strcmp(buffer, name) == 0) && ride_has_any_track_elements(ride))
         {
             return true;
         }
@@ -6282,403 +6254,7 @@ rct_ride_name get_ride_naming(const uint8_t rideType, rct_ride_entry* rideEntry)
     }
 }
 
-/**
- *
- * Network client callback when placing ride pieces
- *   Client does execute placing the piece on the same tick as mouse_up - waits for server command
- * Re-executes function from ride_construction - window_ride_construction_construct()
- * Only uses part that deals with construction state
- */
-
-void game_command_callback_ride_construct_placed_back(
-    [[maybe_unused]] int32_t eax, [[maybe_unused]] int32_t ebx, [[maybe_unused]] int32_t ecx, [[maybe_unused]] int32_t edx,
-    [[maybe_unused]] int32_t esi, [[maybe_unused]] int32_t edi, [[maybe_unused]] int32_t ebp)
-{
-    int32_t trackDirection, x, y, z;
-    track_begin_end trackBeginEnd;
-
-    trackDirection = direction_reverse(_currentTrackPieceDirection);
-    x = _currentTrackBeginX;
-    y = _currentTrackBeginY;
-    z = _currentTrackBeginZ;
-    if (!(trackDirection & 4))
-    {
-        x += CoordsDirectionDelta[trackDirection].x;
-        y += CoordsDirectionDelta[trackDirection].y;
-    }
-
-    if (track_block_get_previous_from_zero(x, y, z, _currentRideIndex, trackDirection, &trackBeginEnd))
-    {
-        _currentTrackBeginX = trackBeginEnd.begin_x;
-        _currentTrackBeginY = trackBeginEnd.begin_y;
-        _currentTrackBeginZ = trackBeginEnd.begin_z;
-        _currentTrackPieceDirection = trackBeginEnd.begin_direction;
-        _currentTrackPieceType = trackBeginEnd.begin_element->AsTrack()->GetTrackType();
-        _currentTrackSelectionFlags = 0;
-        _rideConstructionArrowPulseTime = 0;
-        _rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
-        ride_select_previous_section();
-    }
-    else
-    {
-        _rideConstructionState = RIDE_CONSTRUCTION_STATE_0;
-    }
-
-    window_ride_construction_do_station_check();
-    window_ride_construction_update_active_elements();
-}
-
-void game_command_callback_ride_construct_placed_front(
-    [[maybe_unused]] int32_t eax, [[maybe_unused]] int32_t ebx, [[maybe_unused]] int32_t ecx, [[maybe_unused]] int32_t edx,
-    [[maybe_unused]] int32_t esi, [[maybe_unused]] int32_t edi, [[maybe_unused]] int32_t ebp)
-{
-    int32_t trackDirection, x, y, z;
-
-    trackDirection = _currentTrackPieceDirection;
-    x = _currentTrackBeginX;
-    y = _currentTrackBeginY;
-    z = _currentTrackBeginZ;
-    if (!(trackDirection & 4))
-    {
-        x -= CoordsDirectionDelta[trackDirection].x;
-        y -= CoordsDirectionDelta[trackDirection].y;
-    }
-
-    CoordsXYE next_track;
-    if (track_block_get_next_from_zero(x, y, z, _currentRideIndex, trackDirection, &next_track, &z, &trackDirection, false))
-    {
-        _currentTrackBeginX = next_track.x;
-        _currentTrackBeginY = next_track.y;
-        _currentTrackBeginZ = z;
-        _currentTrackPieceDirection = next_track.element->GetDirection();
-        _currentTrackPieceType = next_track.element->AsTrack()->GetTrackType();
-        _currentTrackSelectionFlags = 0;
-        _rideConstructionArrowPulseTime = 0;
-        _rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
-        ride_select_next_section();
-    }
-    else
-    {
-        _rideConstructionState = RIDE_CONSTRUCTION_STATE_0;
-    }
-
-    window_ride_construction_do_station_check();
-    window_ride_construction_do_entrance_exit_check();
-    window_ride_construction_update_active_elements();
-}
-
-/**
- *
- * Network client callback when removing ride pieces
- *   Client does execute placing the piece on the same tick as mouse_up - waits for server command
- * Re-executes function from ride_construction - window_ride_construction_mouseup_demolish()
- * Only uses part that deals with construction state
- */
-
-void game_command_callback_ride_remove_track_piece(
-    [[maybe_unused]] int32_t eax, [[maybe_unused]] int32_t ebx, [[maybe_unused]] int32_t ecx, [[maybe_unused]] int32_t edx,
-    [[maybe_unused]] int32_t esi, [[maybe_unused]] int32_t edi, [[maybe_unused]] int32_t ebp)
-{
-    int32_t x, y, z, direction, type;
-
-    x = gRideRemoveTrackPieceCallbackX;
-    y = gRideRemoveTrackPieceCallbackY;
-    z = gRideRemoveTrackPieceCallbackZ;
-    direction = gRideRemoveTrackPieceCallbackDirection;
-    type = gRideRemoveTrackPieceCallbackType;
-
-    window_ride_construction_mouseup_demolish_next_piece(x, y, z, direction, type);
-}
-
-/**
- *
- *  rct2: 0x006B2FC5
- */
-void game_command_set_ride_appearance(
-    [[maybe_unused]] int32_t* eax, int32_t* ebx, [[maybe_unused]] int32_t* ecx, int32_t* edx, [[maybe_unused]] int32_t* esi,
-    int32_t* edi, [[maybe_unused]] int32_t* ebp)
-{
-    bool apply = (*ebx & GAME_COMMAND_FLAG_APPLY);
-
-    ride_id_t ride_id = *edx;
-    if (ride_id >= MAX_RIDES)
-    {
-        log_warning("Invalid game command for ride %u", ride_id);
-        *ebx = MONEY32_UNDEFINED;
-        return;
-    }
-    uint8_t type = *ebx >> 8;
-    uint8_t value = *edx >> 8;
-    uint32_t index = (uint32_t)*edi;
-
-    if (*edi < 0)
-    {
-        log_warning("Invalid game command, index %d out of bounds", index);
-        *ebx = MONEY32_UNDEFINED;
-        return;
-    }
-
-    Ride* ride = get_ride(ride_id);
-    if (ride->type == RIDE_TYPE_NULL)
-    {
-        log_warning("Invalid game command, ride_id = %u", ride_id);
-        *ebx = MONEY32_UNDEFINED;
-        return;
-    }
-
-    if (apply && gGameCommandNestLevel == 1)
-    {
-        if (ride->overall_view.xy != RCT_XY8_UNDEFINED)
-        {
-            LocationXYZ16 coord;
-            coord.x = ride->overall_view.x * 32 + 16;
-            coord.y = ride->overall_view.y * 32 + 16;
-            coord.z = tile_element_height(coord.x, coord.y);
-            network_set_player_last_action_coord(network_get_player_index(game_command_playerid), coord);
-        }
-    }
-
-    *ebx = 0;
-    switch (type)
-    {
-        case 0:
-            if (index >= std::size(ride->track_colour))
-            {
-                log_warning("Invalid game command, index %d out of bounds", index);
-                *ebx = MONEY32_UNDEFINED;
-                return;
-            }
-            if (apply)
-            {
-                ride->track_colour[index].main = value;
-                gfx_invalidate_screen();
-            }
-            break;
-        case 1:
-            if (index >= std::size(ride->track_colour))
-            {
-                log_warning("Invalid game command, index %d out of bounds", index);
-                *ebx = MONEY32_UNDEFINED;
-                return;
-            }
-            if (apply)
-            {
-                ride->track_colour[index].additional = value;
-                gfx_invalidate_screen();
-            }
-            break;
-        case 2:
-            if (index >= std::size(ride->vehicle_colours))
-            {
-                log_warning("Invalid game command, index %d out of bounds", index);
-                *ebx = MONEY32_UNDEFINED;
-                return;
-            }
-            if (apply)
-            {
-                *((uint8_t*)(&ride->vehicle_colours[index])) = value;
-                ride_update_vehicle_colours(ride);
-            }
-            break;
-        case 3:
-            if (index >= std::size(ride->vehicle_colours))
-            {
-                log_warning("Invalid game command, index %d out of bounds", index);
-                *ebx = MONEY32_UNDEFINED;
-                return;
-            }
-            if (apply)
-            {
-                *((uint8_t*)(&ride->vehicle_colours[index]) + 1) = value;
-                ride_update_vehicle_colours(ride);
-            }
-            break;
-        case 4:
-            if (index >= std::size(ride->track_colour))
-            {
-                log_warning("Invalid game command, index %d out of bounds", index);
-                *ebx = MONEY32_UNDEFINED;
-                return;
-            }
-            if (apply)
-            {
-                ride->track_colour[index].supports = value;
-                gfx_invalidate_screen();
-            }
-            break;
-        case 5:
-            if (apply)
-            {
-                ride->colour_scheme_type &= ~(RIDE_COLOUR_SCHEME_DIFFERENT_PER_TRAIN | RIDE_COLOUR_SCHEME_DIFFERENT_PER_CAR);
-                ride->colour_scheme_type |= value;
-                for (uint32_t i = 1; i < std::size(ride->vehicle_colours); i++)
-                {
-                    ride->vehicle_colours[i] = ride->vehicle_colours[0];
-                }
-                ride_update_vehicle_colours(ride);
-            }
-            break;
-        case 6:
-            if (apply)
-            {
-                ride->entrance_style = value;
-                gLastEntranceStyle = value;
-                gfx_invalidate_screen();
-            }
-            break;
-        case 7:
-            if (index >= std::size(ride->vehicle_colours))
-            {
-                log_warning("Invalid game command, index %d out of bounds", index);
-                *ebx = MONEY32_UNDEFINED;
-                return;
-            }
-            else
-            {
-                if (apply)
-                {
-                    ride->vehicle_colours[index].Ternary = value;
-                    ride_update_vehicle_colours(ride);
-                }
-            }
-            break;
-    }
-    window_invalidate_by_number(WC_RIDE, ride_id);
-}
-
-/**
- *
- *  rct2: 0x006B53E9
- */
-void game_command_set_ride_price(
-    [[maybe_unused]] int32_t* eax, int32_t* ebx, [[maybe_unused]] int32_t* ecx, int32_t* edx, [[maybe_unused]] int32_t* esi,
-    int32_t* edi, [[maybe_unused]] int32_t* ebp)
-{
-    uint32_t flags = *ebx;
-    uint8_t ride_number = (*edx & 0xFF);
-    if (ride_number >= MAX_RIDES)
-    {
-        log_warning("Invalid game command for ride %u", ride_number);
-        *ebx = MONEY32_UNDEFINED;
-        return;
-    }
-    Ride* ride = get_ride(ride_number);
-    if (ride->type == RIDE_TYPE_NULL)
-    {
-        log_warning("Invalid game command for ride %u", ride_number);
-        *ebx = MONEY32_UNDEFINED;
-        return;
-    }
-    rct_ride_entry* rideEntry = get_ride_entry(ride->subtype);
-    money16 price = *edi;
-    bool secondary_price = (*edx >> 8);
-
-    if (rideEntry == nullptr)
-    {
-        log_warning("Invalid game command for ride %u", ride_number);
-        *ebx = MONEY32_UNDEFINED;
-        return;
-    }
-
-    // eax
-    // ebx flags
-    // ecx ecx
-    // edx ride_number
-    // ebp rideEntry
-
-    *ebx = 0; // for cost check - changing ride price does not cost anything
-
-    gCommandExpenditureType = RCT_EXPENDITURE_TYPE_PARK_RIDE_TICKETS;
-    if (flags & GAME_COMMAND_FLAG_APPLY)
-    {
-        uint32_t shop_item;
-
-        if (ride->overall_view.xy != RCT_XY8_UNDEFINED)
-        {
-            LocationXYZ16 coord;
-            coord.x = ride->overall_view.x * 32 + 16;
-            coord.y = ride->overall_view.y * 32 + 16;
-            coord.z = tile_element_height(coord.x, coord.y);
-            network_set_player_last_action_coord(network_get_player_index(game_command_playerid), coord);
-        }
-
-        if (!secondary_price)
-        {
-            shop_item = SHOP_ITEM_ADMISSION;
-            if (ride->type != RIDE_TYPE_TOILETS)
-            {
-                shop_item = rideEntry->shop_item;
-                if (shop_item == SHOP_ITEM_NONE)
-                {
-                    ride->price = price;
-                    window_invalidate_by_class(WC_RIDE);
-                    return;
-                }
-            }
-            // Check same price in park flags
-            if (!shop_item_has_common_price(shop_item))
-            {
-                ride->price = price;
-                window_invalidate_by_class(WC_RIDE);
-                return;
-            }
-        }
-        else
-        {
-            shop_item = rideEntry->shop_item_secondary;
-            if (shop_item == SHOP_ITEM_NONE)
-            {
-                shop_item = RidePhotoItems[ride->type];
-                if ((ride->lifecycle_flags & RIDE_LIFECYCLE_ON_RIDE_PHOTO) == 0)
-                {
-                    ride->price_secondary = price;
-                    window_invalidate_by_class(WC_RIDE);
-                    return;
-                }
-            }
-            // Check same price in park flags
-            if (!shop_item_has_common_price(shop_item))
-            {
-                ride->price_secondary = price;
-                window_invalidate_by_class(WC_RIDE);
-                return;
-            }
-        }
-        ride = get_ride(0);
-
-        for (uint8_t rideId = 0; rideId < MAX_RIDES; rideId++, ride++)
-        {
-            // Unplaced rides have a type of NULL
-            if (ride->type == RIDE_TYPE_NULL)
-                continue;
-
-            rideEntry = get_ride_entry(ride->subtype);
-
-            if (ride->type != RIDE_TYPE_TOILETS || shop_item != SHOP_ITEM_ADMISSION)
-            {
-                if (rideEntry->shop_item == shop_item)
-                {
-                    ride->price = price;
-                    window_invalidate_by_number(WC_RIDE, rideId);
-                }
-            }
-            else
-            {
-                ride->price = price;
-                window_invalidate_by_number(WC_RIDE, rideId);
-            }
-            // If the shop item is the same or an on-ride photo
-            if (rideEntry->shop_item_secondary == shop_item
-                || (rideEntry->shop_item_secondary == SHOP_ITEM_NONE && shop_item_is_photo(shop_item)))
-            {
-                ride->price_secondary = price;
-                window_invalidate_by_number(WC_RIDE, rideId);
-            }
-        }
-    }
-}
-
-bool ride_type_has_flag(int32_t rideType, int32_t flag)
+bool ride_type_has_flag(int32_t rideType, uint32_t flag)
 {
     return (RideProperties[rideType].flags & flag) != 0;
 }
@@ -6924,7 +6500,7 @@ bool ride_is_block_sectioned(Ride* ride)
     return ride->mode == RIDE_MODE_CONTINUOUS_CIRCUIT_BLOCK_SECTIONED || ride->mode == RIDE_MODE_POWERED_LAUNCH_BLOCK_SECTIONED;
 }
 
-bool ride_has_any_track_elements(ride_id_t rideIndex)
+bool ride_has_any_track_elements(const Ride* ride)
 {
     tile_element_iterator it;
 
@@ -6933,7 +6509,7 @@ bool ride_has_any_track_elements(ride_id_t rideIndex)
     {
         if (it.element->GetType() != TILE_ELEMENT_TYPE_TRACK)
             continue;
-        if (it.element->AsTrack()->GetRideIndex() != rideIndex)
+        if (it.element->AsTrack()->GetRideIndex() != ride->id)
             continue;
         if (it.element->flags & TILE_ELEMENT_FLAG_GHOST)
             continue;
@@ -7287,67 +6863,55 @@ void ride_get_entrance_or_exit_position_from_screen_position(
 
 bool ride_select_backwards_from_front()
 {
-    track_begin_end trackBeginEnd;
-
-    ride_construction_invalidate_current_track();
-    if (track_block_get_previous_from_zero(
-            _currentTrackBeginX, _currentTrackBeginY, _currentTrackBeginZ, _currentRideIndex, _currentTrackPieceDirection,
-            &trackBeginEnd))
+    auto ride = get_ride(_currentRideIndex);
+    if (ride != nullptr)
     {
-        _rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
-        _currentTrackBeginX = trackBeginEnd.begin_x;
-        _currentTrackBeginY = trackBeginEnd.begin_y;
-        _currentTrackBeginZ = trackBeginEnd.begin_z;
-        _currentTrackPieceDirection = trackBeginEnd.begin_direction;
-        _currentTrackPieceType = trackBeginEnd.begin_element->AsTrack()->GetTrackType();
-        _currentTrackSelectionFlags = 0;
-        _rideConstructionArrowPulseTime = 0;
-        return true;
+        ride_construction_invalidate_current_track();
+        track_begin_end trackBeginEnd;
+        if (track_block_get_previous_from_zero(
+                _currentTrackBeginX, _currentTrackBeginY, _currentTrackBeginZ, ride, _currentTrackPieceDirection,
+                &trackBeginEnd))
+        {
+            _rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
+            _currentTrackBeginX = trackBeginEnd.begin_x;
+            _currentTrackBeginY = trackBeginEnd.begin_y;
+            _currentTrackBeginZ = trackBeginEnd.begin_z;
+            _currentTrackPieceDirection = trackBeginEnd.begin_direction;
+            _currentTrackPieceType = trackBeginEnd.begin_element->AsTrack()->GetTrackType();
+            _currentTrackSelectionFlags = 0;
+            _rideConstructionArrowPulseTime = 0;
+            return true;
+        }
     }
-    else
-    {
-        return false;
-    }
+    return false;
 }
 
 bool ride_select_forwards_from_back()
 {
-    int32_t x, y, z, direction;
-
-    ride_construction_invalidate_current_track();
-
-    x = _currentTrackBeginX;
-    y = _currentTrackBeginY;
-    z = _currentTrackBeginZ;
-    direction = direction_reverse(_currentTrackPieceDirection);
-    CoordsXYE next_track;
-
-    if (track_block_get_next_from_zero(x, y, z, _currentRideIndex, direction, &next_track, &z, &direction, false))
+    auto ride = get_ride(_currentRideIndex);
+    if (ride != nullptr)
     {
-        _rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
-        _currentTrackBeginX = next_track.x;
-        _currentTrackBeginY = next_track.y;
-        _currentTrackBeginZ = z;
-        _currentTrackPieceDirection = next_track.element->GetDirection();
-        _currentTrackPieceType = next_track.element->AsTrack()->GetTrackType();
-        _currentTrackSelectionFlags = 0;
-        _rideConstructionArrowPulseTime = 0;
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
+        ride_construction_invalidate_current_track();
 
-money32 ride_remove_track_piece(int32_t x, int32_t y, int32_t z, int32_t direction, int32_t type, uint8_t flags)
-{
-    gGameCommandErrorTitle = STR_RIDE_CONSTRUCTION_CANT_REMOVE_THIS;
-    if (network_get_mode() == NETWORK_MODE_CLIENT)
-    {
-        game_command_callback = game_command_callback_ride_remove_track_piece;
+        int32_t x = _currentTrackBeginX;
+        int32_t y = _currentTrackBeginY;
+        int32_t z = _currentTrackBeginZ;
+        int32_t direction = direction_reverse(_currentTrackPieceDirection);
+        CoordsXYE next_track;
+        if (track_block_get_next_from_zero(x, y, z, ride, direction, &next_track, &z, &direction, false))
+        {
+            _rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
+            _currentTrackBeginX = next_track.x;
+            _currentTrackBeginY = next_track.y;
+            _currentTrackBeginZ = z;
+            _currentTrackPieceDirection = next_track.element->GetDirection();
+            _currentTrackPieceType = next_track.element->AsTrack()->GetTrackType();
+            _currentTrackSelectionFlags = 0;
+            _rideConstructionArrowPulseTime = 0;
+            return true;
+        }
     }
-    return game_do_command(x, flags | ((direction & 3) << 8), y, type, GAME_COMMAND_REMOVE_TRACK, z, 0);
+    return false;
 }
 
 /**
@@ -7442,7 +7006,7 @@ void ride_fix_breakdown(Ride* ride, int32_t reliabilityIncreaseFactor)
  *
  *  rct2: 0x006DE102
  */
-static void ride_update_vehicle_colours(Ride* ride)
+void ride_update_vehicle_colours(Ride* ride)
 {
     if (ride->type == RIDE_TYPE_SPACE_RINGS || ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_16))
     {
@@ -7790,28 +7354,28 @@ void ride_update_max_vehicles(Ride* ride)
     }
 }
 
-void ride_set_ride_entry(ride_id_t rideIndex, int32_t rideEntry)
+void ride_set_ride_entry(Ride* ride, int32_t rideEntry)
 {
     gGameCommandErrorTitle = STR_RIDE_SET_VEHICLE_TYPE_FAIL;
     game_do_command(
-        0, GAME_COMMAND_FLAG_APPLY | (RIDE_SET_VEHICLES_COMMAND_TYPE_RIDE_ENTRY << 8), 0, (rideEntry << 8) | rideIndex,
+        0, GAME_COMMAND_FLAG_APPLY | (RIDE_SET_VEHICLES_COMMAND_TYPE_RIDE_ENTRY << 8), 0, (rideEntry << 8) | ride->id,
         GAME_COMMAND_SET_RIDE_VEHICLES, 0, 0);
 }
 
-void ride_set_num_vehicles(ride_id_t rideIndex, int32_t numVehicles)
+void ride_set_num_vehicles(Ride* ride, int32_t numVehicles)
 {
     gGameCommandErrorTitle = STR_RIDE_SET_VEHICLE_SET_NUM_TRAINS_FAIL;
     game_do_command(
-        0, GAME_COMMAND_FLAG_APPLY | (RIDE_SET_VEHICLES_COMMAND_TYPE_NUM_TRAINS << 8), 0, (numVehicles << 8) | rideIndex,
+        0, GAME_COMMAND_FLAG_APPLY | (RIDE_SET_VEHICLES_COMMAND_TYPE_NUM_TRAINS << 8), 0, (numVehicles << 8) | ride->id,
         GAME_COMMAND_SET_RIDE_VEHICLES, 0, 0);
 }
 
-void ride_set_num_cars_per_vehicle(ride_id_t rideIndex, int32_t numCarsPerVehicle)
+void ride_set_num_cars_per_vehicle(Ride* ride, int32_t numCarsPerVehicle)
 {
     gGameCommandErrorTitle = STR_RIDE_SET_VEHICLE_SET_NUM_CARS_PER_TRAIN_FAIL;
     game_do_command(
         0, GAME_COMMAND_FLAG_APPLY | (RIDE_SET_VEHICLES_COMMAND_TYPE_NUM_CARS_PER_TRAIN << 8), 0,
-        (numCarsPerVehicle << 8) | rideIndex, GAME_COMMAND_SET_RIDE_VEHICLES, 0, 0);
+        (numCarsPerVehicle << 8) | ride->id, GAME_COMMAND_SET_RIDE_VEHICLES, 0, 0);
 }
 
 static bool ride_is_vehicle_type_valid(Ride* ride, uint8_t inputRideEntryIndex)
@@ -8011,9 +7575,8 @@ void game_command_set_ride_vehicles(
  *
  *  rct2: 0x006CB945
  */
-void sub_6CB945(ride_id_t rideIndex)
+void sub_6CB945(Ride* ride)
 {
-    Ride* ride = get_ride(rideIndex);
     if (ride->type != RIDE_TYPE_MAZE)
     {
         for (uint8_t stationId = 0; stationId < MAX_STATIONS; ++stationId)
@@ -8047,7 +7610,7 @@ void sub_6CB945(ride_id_t rideIndex)
                         continue;
                     if (tileElement->GetType() != TILE_ELEMENT_TYPE_TRACK)
                         continue;
-                    if (tileElement->AsTrack()->GetRideIndex() != rideIndex)
+                    if (tileElement->AsTrack()->GetRideIndex() != ride->id)
                         continue;
                     if (tileElement->AsTrack()->GetSequenceIndex() != 0)
                         continue;
@@ -8114,14 +7677,14 @@ void sub_6CB945(ride_id_t rideIndex)
     TileCoordsXYZD* locationList = locations;
     for (uint8_t stationId = 0; stationId < MAX_STATIONS; ++stationId)
     {
-        TileCoordsXYZD entrance = ride_get_entrance_location(rideIndex, stationId);
+        auto entrance = ride_get_entrance_location(ride, stationId);
         if (!entrance.isNull())
         {
             *locationList++ = entrance;
             ride_clear_entrance_location(ride, stationId);
         }
 
-        TileCoordsXYZD exit = ride_get_exit_location(rideIndex, stationId);
+        auto exit = ride_get_exit_location(ride, stationId);
         if (!exit.isNull())
         {
             *locationList++ = exit;
@@ -8158,7 +7721,7 @@ void sub_6CB945(ride_id_t rideIndex)
         {
             if (tileElement->GetType() != TILE_ELEMENT_TYPE_ENTRANCE)
                 continue;
-            if (tileElement->AsEntrance()->GetRideIndex() != rideIndex)
+            if (tileElement->AsEntrance()->GetRideIndex() != ride->id)
                 continue;
             if (tileElement->AsEntrance()->GetEntranceType() > ENTRANCE_TYPE_RIDE_EXIT)
                 continue;
@@ -8173,7 +7736,7 @@ void sub_6CB945(ride_id_t rideIndex)
             {
                 if (trackElement->GetType() != TILE_ELEMENT_TYPE_TRACK)
                     continue;
-                if (trackElement->AsTrack()->GetRideIndex() != rideIndex)
+                if (trackElement->AsTrack()->GetRideIndex() != ride->id)
                     continue;
                 if (trackElement->base_height != tileElement->base_height)
                     continue;
@@ -8236,9 +7799,8 @@ void sub_6CB945(ride_id_t rideIndex)
     }
 }
 
-void ride_set_to_default_inspection_interval(ride_id_t rideIndex)
+void ride_set_to_default_inspection_interval(Ride* ride)
 {
-    Ride* ride = get_ride(rideIndex);
     uint8_t defaultInspectionInterval = gConfigGeneral.default_inspection_interval;
     if (ride->inspection_interval != defaultInspectionInterval)
     {
@@ -8246,7 +7808,7 @@ void ride_set_to_default_inspection_interval(ride_id_t rideIndex)
         {
             gGameCommandErrorTitle = STR_CANT_CHANGE_OPERATING_MODE;
             game_do_command(
-                0, (defaultInspectionInterval << 8) | 1, 0, (5 << 8) | rideIndex, GAME_COMMAND_SET_RIDE_SETTING, 0, 0);
+                0, (defaultInspectionInterval << 8) | 1, 0, (5 << 8) | ride->id, GAME_COMMAND_SET_RIDE_SETTING, 0, 0);
         }
     }
 }
@@ -8255,9 +7817,8 @@ void ride_set_to_default_inspection_interval(ride_id_t rideIndex)
  *
  *  rct2: 0x006B752C
  */
-void ride_crash(ride_id_t rideIndex, uint8_t vehicleIndex)
+void ride_crash(Ride* ride, uint8_t vehicleIndex)
 {
-    Ride* ride = get_ride(rideIndex);
     rct_vehicle* vehicle = GET_VEHICLE(ride->vehicles[vehicleIndex]);
 
     if (!(gScreenFlags & SCREEN_FLAGS_TITLE_DEMO))
@@ -8278,7 +7839,7 @@ void ride_crash(ride_id_t rideIndex, uint8_t vehicleIndex)
     set_format_arg(2, uint32_t, ride->name_arguments);
     if (gConfigNotifications.ride_crashed)
     {
-        news_item_add_to_queue(NEWS_ITEM_RIDE, STR_RIDE_HAS_CRASHED, rideIndex);
+        news_item_add_to_queue(NEWS_ITEM_RIDE, STR_RIDE_HAS_CRASHED, ride->id);
     }
 }
 
@@ -8371,9 +7932,8 @@ rct_vehicle* ride_get_broken_vehicle(Ride* ride)
  *
  *  rct2: 0x006D235B
  */
-void ride_delete(ride_id_t rideIndex)
+void ride_delete(Ride* ride)
 {
-    Ride* ride = get_ride(rideIndex);
     user_string_free(ride->name);
     ride->type = RIDE_TYPE_NULL;
 }
@@ -8952,7 +8512,7 @@ void determine_ride_entrance_and_exit_locations()
     }
 }
 
-void ride_clear_leftover_entrances(ride_id_t rideIndex)
+void ride_clear_leftover_entrances(Ride* ride)
 {
     tile_element_iterator it;
 
@@ -8961,7 +8521,7 @@ void ride_clear_leftover_entrances(ride_id_t rideIndex)
     {
         if (it.element->GetType() == TILE_ELEMENT_TYPE_ENTRANCE
             && it.element->AsEntrance()->GetEntranceType() != ENTRANCE_TYPE_PARK_ENTRANCE
-            && it.element->AsEntrance()->GetRideIndex() == rideIndex)
+            && it.element->AsEntrance()->GetRideIndex() == ride->id)
         {
             tile_element_remove(it.element);
             tile_element_iterator_restart_for_tile(&it);
