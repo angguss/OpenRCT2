@@ -82,7 +82,7 @@ void platform_get_time_local(rct2_time* out_time)
 
 bool platform_file_exists(const utf8* path)
 {
-#    ifdef __ENABLE_PHYSFS__
+#    ifdef ENABLE_PHYSFS
     return platform_file_exists_physfs(path);
 #    else
     wchar_t* wPath = utf8_to_widechar(path);
@@ -95,7 +95,7 @@ bool platform_file_exists(const utf8* path)
 
 bool platform_directory_exists(const utf8* path)
 {
-#    ifdef __ENABLE_PHYSFS__
+#    ifdef ENABLE_PHYSFS
     return platform_directory_exists_physfs(path);
 #    else
     wchar_t* wPath = utf8_to_widechar(path);
@@ -129,7 +129,7 @@ bool platform_original_rct1_data_exists(const utf8* path)
 
 bool platform_ensure_directory_exists(const utf8* path)
 {
-#    ifdef __ENABLE_PHYSFS__
+#    ifdef ENABLE_PHYSFS
     return platform_ensure_directory_exists_physfs(path);
 #    else
     if (platform_directory_exists(path))
@@ -145,7 +145,7 @@ bool platform_ensure_directory_exists(const utf8* path)
 
 bool platform_directory_delete(const utf8* path)
 {
-#    ifdef __ENABLE_PHYSFS__
+#    ifdef ENABLE_PHYSFS
     return platform_directory_delete_physfs(path);
 #    else
     wchar_t pszFrom[MAX_PATH];
@@ -223,7 +223,7 @@ bool platform_file_move(const utf8* srcPath, const utf8* dstPath)
 
 bool platform_file_delete(const utf8* path)
 {
-#    ifdef __ENABLE_PHYSFS__
+#    ifdef ENABLE_PHYSFS
     return platform_file_delete_physfs(path);
 #    else
     wchar_t* wPath = utf8_to_widechar(path);

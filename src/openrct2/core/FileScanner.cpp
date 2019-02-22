@@ -215,7 +215,7 @@ private:
     }
 };
 
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
 class FileScannerPhysFs final : public FileScannerBase
 {
 public:
@@ -410,7 +410,7 @@ private:
 
 IFileScanner* Path::ScanDirectory(const std::string& pattern, bool recurse)
 {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     return new FileScannerPhysFs(pattern, recurse);
 #elif defined(_WIN32)
     return new FileScannerWindows(pattern, recurse);

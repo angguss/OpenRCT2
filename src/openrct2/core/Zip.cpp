@@ -18,7 +18,7 @@ class ZipArchive final : public IZipArchive
 {
 private:
     zip_t* _zip;
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     PHYSFS_File* file;
 #endif
     ZIP_ACCESS _access;
@@ -32,7 +32,7 @@ public:
         {
             zipOpenMode = ZIP_CREATE;
         }
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         if (access == ZIP_ACCESS::WRITE)
         {
             file = PHYSFS_openWrite(path.data());
@@ -47,7 +47,7 @@ public:
         if (access == ZIP_ACCESS::READ)
         {
             uint8_t* buf = new uint8_t[stat.filesize];
-            PHYSFS_read(file, buf, stat.filesize, 1);
+            PHYSFS_readBytes(file, buf, stat.filesize);
             zip_error_t er;
             zip_source_t* zipbuffer = zip_source_buffer_create(buf, stat.filesize, 1, &er);
             _zip = zip_open_from_source(zipbuffer, 0, &er);
@@ -72,7 +72,7 @@ public:
     ~ZipArchive() override
     {
         zip_close(_zip);
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         PHYSFS_close(file);
 #endif
     }

@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
 #include <physfs.h>
 #endif
 

@@ -47,7 +47,7 @@ namespace File
     std::vector<uint8_t> ReadAllBytes(const std::string_view& path)
     {
         std::vector<uint8_t> result;
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         PHYSFS_File* f = PHYSFS_openRead(path.data());
 
         PHYSFS_Stat s;
@@ -136,7 +136,7 @@ namespace File
     uint64_t GetLastModified(const std::string& path)
     {
         uint64_t lastModified = 0;
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         PHYSFS_Stat stat;
         PHYSFS_stat(path.c_str(), &stat);
         lastModified = stat.modtime;

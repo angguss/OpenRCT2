@@ -116,7 +116,7 @@ static size_t platform_utf8_to_multibyte(const utf8* path, char* buffer, size_t 
 
 bool platform_file_exists(const utf8* path)
 {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     return platform_file_exists_physfs(path);
 #endif
     char buffer[MAX_PATH];
@@ -128,7 +128,7 @@ bool platform_file_exists(const utf8* path)
 
 bool platform_directory_exists(const utf8* path)
 {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     return platform_file_exists_physfs(path);
 #endif
     char buffer[MAX_PATH];
@@ -194,7 +194,7 @@ static mode_t openrct2_getumask()
 
 bool platform_ensure_directory_exists(const utf8* path)
 {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     return platform_ensure_directory_exists_physfs(path);
 #endif
     mode_t mask = openrct2_getumask();
@@ -237,7 +237,7 @@ bool platform_ensure_directory_exists(const utf8* path)
 
 bool platform_directory_delete(const utf8* path)
 {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     return platform_directory_delete_physfs(path);
 #endif
 #    ifdef _FTS_H

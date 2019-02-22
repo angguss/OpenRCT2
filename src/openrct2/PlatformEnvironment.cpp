@@ -130,7 +130,7 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
     basePaths[(size_t)DIRBASE::CACHE] = Path::Combine(Platform::GetFolderPath(SPECIAL_FOLDER::USER_CACHE), subDirectory);
     basePaths[(size_t)DIRBASE::DOCUMENTATION] = Platform::GetDocsPath();
 
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     PHYSFS_init(nullptr);
 
     std::string userPath(basePaths[(size_t)DIRBASE::USER]);
@@ -211,7 +211,7 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
 // clang-format off
 const char * PlatformEnvironment::DirectoryNamesRCT2[] =
 {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     "data",
 #else
     "Data",                 // DATA

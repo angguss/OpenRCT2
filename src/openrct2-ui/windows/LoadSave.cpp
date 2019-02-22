@@ -828,7 +828,7 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
     window_loadsave_widgets[WIDX_NEW_FILE].type = includeNewItem ? WWT_BUTTON : WWT_EMPTY;
     window_loadsave_widgets[WIDX_NEW_FOLDER].type = includeNewItem ? WWT_BUTTON : WWT_EMPTY;
 
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     if (str_is_null_or_empty(directory))
     {
         w->disabled_widgets |= (1 << WIDX_NEW_FILE) | (1 << WIDX_NEW_FOLDER) | (1 << WIDX_UP);
@@ -875,7 +875,7 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
         {
             *(ch + 1) = '\0';
         }
-#ifndef __ENABLE_PHYSFS__
+#ifndef ENABLE_PHYSFS
         else if (drives)
         {
             // If on Windows, clear the entire path to show the drives
@@ -889,7 +889,7 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
         }
 
         // Disable the Up button if the current directory is the root directory
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         if (str_is_null_or_empty(_parentDirectory))
             w->disabled_widgets |= (1 << WIDX_UP);
         else
@@ -910,7 +910,7 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
         {
             auto subDir = sdName + PATH_SEPARATOR;
 
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
             // Need to unhardcode this
             if (subDir == "data/")
                 continue;

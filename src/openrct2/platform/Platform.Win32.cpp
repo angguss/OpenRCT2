@@ -97,7 +97,7 @@ namespace Platform
                 {
                     path = GetFolderPath(SPECIAL_FOLDER::USER_HOME);
                 }
-#    ifdef __ENABLE_PHYSFS__
+#    ifdef ENABLE_PHYSFS
                 Path::ConvertPathSlashes(path, false);
 #    endif
                 return path;
@@ -117,7 +117,7 @@ namespace Platform
                         path = "C:\\";
                     }
                 }
-#    ifdef __ENABLE_PHYSFS__
+#    ifdef ENABLE_PHYSFS
                 Path::ConvertPathSlashes(path, false);
 #    endif
                 return path;
@@ -133,7 +133,7 @@ namespace Platform
                 {
                     path = Path::Combine(path, "DiscordGames\\RollerCoaster Tycoon 2 Triple Thrill Pack\\content\\Game");
                 }
-#    ifdef __ENABLE_PHYSFS__
+#    ifdef ENABLE_PHYSFS
                 Path::ConvertPathSlashes(path, false);
 #    endif
                 return path;
@@ -161,7 +161,7 @@ namespace Platform
 
     std::string GetCurrentExecutablePath()
     {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         std::string exeName = WIN32_GetModuleFileNameW(nullptr);
         Path::ConvertPathSlashes(exeName, false);
         return exeName;

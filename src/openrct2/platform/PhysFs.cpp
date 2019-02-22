@@ -1,4 +1,4 @@
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
 
 #    include "platform.h"
 

@@ -170,7 +170,7 @@ namespace Path
 
     utf8* GetAbsolute(utf8* buffer, size_t bufferSize, const utf8* relativePath)
     {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         if (relativePath != nullptr)
         {
             if (relativePath[0] == '/')
@@ -214,7 +214,7 @@ namespace Path
 
     std::string GetAbsolute(const std::string& relative)
     {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         // This is a hack, clean this up to get a real absolute based on physfs mountpoint
         return relative;
 #else
@@ -285,6 +285,7 @@ namespace Path
 
     void ConvertPathSlashes(std::string& path, bool cleanAbsolutePath)
     {
+#ifdef _WIN32
         bool absolute = false;
         for (size_t i = 0; i < path.length(); i++)
         {
@@ -302,7 +303,6 @@ namespace Path
                     path[i] = '/';
             }
         }
-#ifdef _WIN32
         if (absolute)
             path.insert(path.begin(), '/');
 #endif

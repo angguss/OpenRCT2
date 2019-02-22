@@ -213,7 +213,7 @@ static std::string GetChangelogPath()
 static std::string GetChangelogText()
 {
     auto path = GetChangelogPath();
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     return File::ReadAllText(path);
 #else
 #if defined(_WIN32) && !defined(__MINGW32__)

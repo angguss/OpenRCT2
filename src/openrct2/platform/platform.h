@@ -28,7 +28,7 @@ struct rct2_install_info;
 
 #define INVALID_HANDLE (-1)
 
-#if defined(__ENABLE_PHYSFS__)
+#if defined(ENABLE_PHYSFS)
 #    define PATH_SEPARATOR "/"
 #    if defined(_WIN32)
 #        define PLATFORM_NEWLINE "\r\n"
@@ -145,7 +145,7 @@ float platform_get_default_scale();
 // Called very early in the program before parsing commandline arguments.
 void core_init();
 
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
 #    include <physfs.h>
 
 bool platform_file_exists_physfs(const utf8* path);

@@ -15,7 +15,7 @@
 #include "String.hpp"
 
 #include <algorithm>
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
 #    include "Path.hpp"
 
 #    include <physfs.h>
@@ -34,7 +34,7 @@ enum
 class FileStream final : public IStream
 {
 private:
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
     PHYSFS_file* _file = nullptr;
     std::string _path;
 #else
@@ -75,7 +75,7 @@ public:
             default:
                 throw;
         }
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         std::string path_str = std::string(path);
         size_t found = path_str.find("C:");
         if (found != std::string::npos)
@@ -120,7 +120,7 @@ public:
 
     ~FileStream() override
     {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         PHYSFS_close(_file);
         _disposed = true;
 #else
@@ -150,7 +150,7 @@ public:
     }
     uint64_t GetPosition() const override
     {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         return PHYSFS_tell(_file);
 #elif defined(_MSC_VER)
         return _ftelli64(_file);
@@ -168,7 +168,7 @@ public:
 
     void Seek(int64_t offset, int32_t origin) override
     {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         switch (origin)
         {
             case STREAM_SEEK_BEGIN:
@@ -228,7 +228,7 @@ public:
         uint64_t remainingBytes = GetLength() - GetPosition();
         if (length <= remainingBytes)
         {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
             // Existing code (save game) reads a file open in write mode,
             // so this is necessary
             if (_canRead == false)
@@ -265,7 +265,7 @@ public:
 
     void Write(const void* buffer, uint64_t length) override
     {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         if (PHYSFS_writeBytes(_file, buffer, length) < 0)
 #else
         if (fwrite(buffer, (size_t)length, 1, _file) != 1)
@@ -280,7 +280,7 @@ public:
 
     uint64_t TryRead(void* buffer, uint64_t length) override
     {
-#ifdef __ENABLE_PHYSFS__
+#ifdef ENABLE_PHYSFS
         size_t readBytes = PHYSFS_readBytes(_file, buffer, length);
 #else
         size_t readBytes = fread(buffer, 1, (size_t)length, _file);
