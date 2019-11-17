@@ -57,28 +57,7 @@ public:
 
     FileStream(const utf8* path, int32_t fileMode)
     {
-        const char* mode;
-        switch (fileMode)
-        {
-            case FILE_MODE_OPEN:
-                mode = "rb";
-                _canRead = true;
-                _canWrite = false;
-                break;
-            case FILE_MODE_WRITE:
-                mode = "w+b";
-                _canRead = false;
-                _canWrite = true;
-                break;
-            case FILE_MODE_APPEND:
-                mode = "a";
-                _canRead = false;
-                _canWrite = true;
-                break;
-            default:
-                throw;
-        }
-#ifdef ENABLE_PHYSFS
+#if defined(ENABLE_PHYSFS)
         std::string path_str = std::string(path);
         size_t found = path_str.find("C:");
         if (found != std::string::npos)
@@ -101,11 +80,33 @@ public:
                 break;
         }
         _path = path_str;
-#elif defined(_WIN32)
+#else
+        const char* mode;
+        switch (fileMode)
+        {
+            case FILE_MODE_OPEN:
+                mode = "rb";
+                _canRead = true;
+                _canWrite = false;
+                break;
+            case FILE_MODE_WRITE:
+                mode = "w+b";
+                _canRead = false;
+                _canWrite = true;
+                break;
+            case FILE_MODE_APPEND:
+                mode = "a";
+                _canRead = false;
+                _canWrite = true;
+                break;
+            default:
+                throw;
+        }
+#   if defined(_WIN32)
         auto pathW = String::ToWideChar(path);
         auto modeW = String::ToWideChar(mode);
         _file = _wfopen(pathW.c_str(), modeW.c_str());
-#else
+#   else
         if (fileMode == FILE_MODE_OPEN)
         {
             struct stat fileStat;
@@ -119,6 +120,7 @@ public:
         {
             _file = fopen(path, mode);
         }
+#   endif
 #endif
         if (_file == nullptr)
         {
