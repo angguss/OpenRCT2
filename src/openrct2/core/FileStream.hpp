@@ -101,7 +101,7 @@ public:
                 break;
         }
         _path = path_str;
-#elif _WIN32
+#elif defined(_WIN32)
         auto pathW = String::ToWideChar(path);
         auto modeW = String::ToWideChar(mode);
         _file = _wfopen(pathW.c_str(), modeW.c_str());

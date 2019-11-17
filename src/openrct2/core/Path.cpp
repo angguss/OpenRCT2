@@ -170,7 +170,6 @@ namespace Path
 
     utf8* GetAbsolute(utf8* buffer, size_t bufferSize, const utf8* relativePath)
     {
-<<<<<<< HEAD
 #ifdef ENABLE_PHYSFS
         if (relativePath != nullptr)
         {
@@ -183,11 +182,7 @@ namespace Path
         String::Set(buffer, bufferSize, std::string(std::string("/") + std::string(relativePath)).c_str());
         return buffer;
 #elif defined(_WIN32)
-        wchar_t* relativePathW = utf8_to_widechar(relativePath);
-=======
-#ifdef _WIN32
         auto relativePathW = String::ToWideChar(relativePath);
->>>>>>> develop
         wchar_t absolutePathW[MAX_PATH];
         DWORD length = GetFullPathNameW(relativePathW.c_str(), (DWORD)std::size(absolutePathW), absolutePathW, nullptr);
         if (length == 0)
