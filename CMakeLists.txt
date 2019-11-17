@@ -263,7 +263,7 @@ if (ENABLE_LIGHTFX)
     add_definitions(-D__ENABLE_LIGHTFX__)
 endif ()
 if (ENABLE_PHYSFS)
-    add_definitions(-D__ENABLE_PHYSFS__)
+    add_definitions(-DENABLE_PHYSFS)
 endif ()
 
 if (CXX_WARN_SUGGEST_FINAL_TYPES)
