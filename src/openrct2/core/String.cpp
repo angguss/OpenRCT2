@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -97,7 +97,7 @@ namespace String
 #endif
     }
 
-    std::wstring ToUtf16(const std::string_view& src)
+    std::wstring ToWideChar(const std::string_view& src)
     {
 #ifdef _WIN32
         int srcLen = (int)src.size();
@@ -184,9 +184,9 @@ namespace String
     {
         if (ignoreCase)
         {
-            while (*str != '\0' && *match != '\0')
+            while (*match != '\0')
             {
-                if (tolower(*str++) != tolower(*match++))
+                if (*str == '\0' || tolower(*str++) != tolower(*match++))
                 {
                     return false;
                 }
@@ -195,9 +195,9 @@ namespace String
         }
         else
         {
-            while (*str != '\0' && *match != '\0')
+            while (*match != '\0')
             {
-                if (*str++ != *match++)
+                if (*str == '\0' || *str++ != *match++)
                 {
                     return false;
                 }
@@ -706,7 +706,8 @@ namespace String
     std::string ToUpper(const std::string_view& src)
     {
 #ifdef _WIN32
-        auto srcW = ToUtf16(src);
+#    if _WIN32_WINNT >= 0x0600
+        auto srcW = ToWideChar(src);
 
         // Measure how long the destination needs to be
         auto requiredSize = LCMapStringEx(
@@ -731,6 +732,10 @@ namespace String
         {
             return String::ToUtf8(dstW);
         }
+#    else
+        log_warning("String::ToUpper not supported");
+        return std::string(src);
+#    endif
 #else
         icu::UnicodeString str = icu::UnicodeString::fromUTF8(std::string(src));
         str.toUpper();

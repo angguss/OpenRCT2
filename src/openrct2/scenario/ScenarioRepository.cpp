@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -133,12 +133,12 @@ private:
 public:
     explicit ScenarioFileIndex(const IPlatformEnvironment& env)
         : FileIndex(
-              "scenario index", MAGIC_NUMBER, VERSION, env.GetFilePath(PATHID::CACHE_SCENARIOS), std::string(PATTERN),
-              std::vector<std::string>({
-                  env.GetDirectoryPath(DIRBASE::RCT1, DIRID::SCENARIO),
-                  env.GetDirectoryPath(DIRBASE::RCT2, DIRID::SCENARIO),
-                  env.GetDirectoryPath(DIRBASE::USER, DIRID::SCENARIO),
-              }))
+            "scenario index", MAGIC_NUMBER, VERSION, env.GetFilePath(PATHID::CACHE_SCENARIOS), std::string(PATTERN),
+            std::vector<std::string>({
+                env.GetDirectoryPath(DIRBASE::RCT1, DIRID::SCENARIO),
+                env.GetDirectoryPath(DIRBASE::RCT2, DIRID::SCENARIO),
+                env.GetDirectoryPath(DIRBASE::USER, DIRID::SCENARIO),
+            }))
     {
     }
 

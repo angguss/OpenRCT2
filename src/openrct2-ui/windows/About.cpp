@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,9 +16,9 @@
 #include <openrct2/localisation/LocalisationService.h>
 #include <openrct2/sprites.h>
 
-#define WW 400
-#define WH 350
-#define TABHEIGHT 50
+constexpr int32_t WW = 400;
+constexpr int32_t WH = 350;
+constexpr int32_t TABHEIGHT = 50;
 
 // clang-format off
 enum
@@ -333,5 +333,5 @@ static void window_about_set_page(rct_window* w, int32_t page)
     w->pressed_widgets |= (page == WINDOW_ABOUT_PAGE_RCT2) ? (1ULL << WIDX_TAB_ABOUT_RCT2) : (1ULL << WIDX_TAB_ABOUT_OPENRCT2);
 
     window_init_scroll_widgets(w);
-    window_invalidate(w);
+    w->Invalidate();
 }

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -33,9 +33,9 @@
 #include <openrct2/windows/Intent.h>
 #include <openrct2/world/Park.h>
 
-#define AVAILABILITY_STRING_SIZE 256
-#define WH 382
-#define WW 601
+constexpr size_t AVAILABILITY_STRING_SIZE = 256;
+constexpr int32_t WH = 382;
+constexpr int32_t WW = 601;
 
 static uint8_t _windowNewRideCurrentTab;
 static ride_list_item _windowNewRideHighlightedItem[6];
@@ -207,8 +207,8 @@ static void window_new_ride_mouseup(rct_window *w, rct_widgetindex widgetIndex);
 static void window_new_ride_mousedown(rct_window *w, rct_widgetindex widgetIndex, rct_widget *widget);
 static void window_new_ride_update(rct_window *w);
 static void window_new_ride_scrollgetsize(rct_window *w, int32_t scrollIndex, int32_t *width, int32_t *height);
-static void window_new_ride_scrollmousedown(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
-static void window_new_ride_scrollmouseover(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
+static void window_new_ride_scrollmousedown(rct_window *w, int32_t scrollIndex, ScreenCoordsXY screenCoords);
+static void window_new_ride_scrollmouseover(rct_window *w, int32_t scrollIndex, ScreenCoordsXY screenCoords);
 static void window_new_ride_invalidate(rct_window *w);
 static void window_new_ride_paint(rct_window *w, rct_drawpixelinfo *dpi);
 static void window_new_ride_scrollpaint(rct_window *w, rct_drawpixelinfo *dpi, int32_t scrollIndex);
@@ -264,7 +264,7 @@ static constexpr const int32_t window_new_ride_tab_animation_divisor[] = { 4, 8,
 
 static void window_new_ride_set_page(rct_window* w, int32_t page);
 static void window_new_ride_refresh_widget_sizing(rct_window* w);
-static ride_list_item window_new_ride_scroll_get_ride_list_item_at(rct_window* w, int32_t x, int32_t y);
+static ride_list_item window_new_ride_scroll_get_ride_list_item_at(rct_window* w, ScreenCoordsXY screenCoords);
 static void window_new_ride_paint_ride_information(
     rct_window* w, rct_drawpixelinfo* dpi, ride_list_item item, int32_t x, int32_t y, int32_t width);
 static void window_new_ride_select(rct_window* w);
@@ -589,7 +589,7 @@ static void window_new_ride_set_page(rct_window* w, int32_t page)
     }
 
     window_new_ride_refresh_widget_sizing(w);
-    window_invalidate(w);
+    w->Invalidate();
 
     if (page < WINDOW_NEW_RIDE_PAGE_RESEARCH)
     {
@@ -633,7 +633,7 @@ static void window_new_ride_refresh_widget_sizing(rct_window* w)
     // Handle new window size
     if (w->width != width || w->height != height)
     {
-        window_invalidate(w);
+        w->Invalidate();
 
         // Resize widgets to new window size
         window_new_ride_widgets[WIDX_BACKGROUND].right = width - 1;
@@ -646,7 +646,7 @@ static void window_new_ride_refresh_widget_sizing(rct_window* w)
 
         w->width = width;
         w->height = height;
-        window_invalidate(w);
+        w->Invalidate();
     }
 
     window_init_scroll_widgets(w);
@@ -763,41 +763,41 @@ static void window_new_ride_scrollgetsize(rct_window* w, int32_t scrollIndex, in
  *
  *  rct2: 0x006B6C89
  */
-static void window_new_ride_scrollmousedown(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_new_ride_scrollmousedown(rct_window* w, int32_t scrollIndex, ScreenCoordsXY screenCoords)
 {
     ride_list_item item;
 
-    item = window_new_ride_scroll_get_ride_list_item_at(w, x, y);
+    item = window_new_ride_scroll_get_ride_list_item_at(w, screenCoords);
     if (item.type == RIDE_TYPE_NULL && item.entry_index == RIDE_ENTRY_INDEX_NULL)
         return;
 
     _windowNewRideHighlightedItem[_windowNewRideCurrentTab] = item;
     w->new_ride.selected_ride_id = item.ride_type_and_entry;
 
-    audio_play_sound(SOUND_CLICK_1, 0, w->x + (w->width / 2));
+    audio_play_sound(SoundId::Click1, 0, w->x + (w->width / 2));
     w->new_ride.selected_ride_countdown = 8;
-    window_invalidate(w);
+    w->Invalidate();
 }
 
 /**
  *
  *  rct2: 0x006B6C51
  */
-static void window_new_ride_scrollmouseover(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_new_ride_scrollmouseover(rct_window* w, int32_t scrollIndex, ScreenCoordsXY screenCoords)
 {
     ride_list_item item;
 
     if (w->new_ride.selected_ride_id != -1)
         return;
 
-    item = window_new_ride_scroll_get_ride_list_item_at(w, x, y);
+    item = window_new_ride_scroll_get_ride_list_item_at(w, screenCoords);
 
     if (w->new_ride.highlighted_ride_id == item.ride_type_and_entry)
         return;
 
     w->new_ride.highlighted_ride_id = item.ride_type_and_entry;
     _windowNewRideHighlightedItem[_windowNewRideCurrentTab] = item;
-    window_invalidate(w);
+    w->Invalidate();
 }
 
 /**
@@ -903,17 +903,17 @@ static void window_new_ride_scrollpaint(rct_window* w, rct_drawpixelinfo* dpi, i
  *
  *  rct2: 0x006B6D3C
  */
-static ride_list_item window_new_ride_scroll_get_ride_list_item_at(rct_window* w, int32_t x, int32_t y)
+static ride_list_item window_new_ride_scroll_get_ride_list_item_at(rct_window* w, ScreenCoordsXY screenCoords)
 {
     ride_list_item result;
     result.type = RIDE_TYPE_NULL;
     result.entry_index = RIDE_ENTRY_INDEX_NULL;
 
-    if (--x < 0 || --y < 0)
+    if (--screenCoords.x < 0 || --screenCoords.y < 0)
         return result;
 
-    int32_t column = x / 116;
-    int32_t row = y / 116;
+    int32_t column = screenCoords.x / 116;
+    int32_t row = screenCoords.y / 116;
     if (column >= 5)
         return result;
 
@@ -932,8 +932,7 @@ static ride_list_item window_new_ride_scroll_get_ride_list_item_at(rct_window* w
 
 static int32_t get_num_track_designs(ride_list_item item)
 {
-    char entry[DAT_NAME_LENGTH + 1];
-    const char* entryPtr = nullptr;
+    std::string entryName;
     rct_ride_entry* rideEntry = nullptr;
 
     if (item.type < 0x80)
@@ -941,22 +940,20 @@ static int32_t get_num_track_designs(ride_list_item item)
         rideEntry = get_ride_entry(item.entry_index);
         if (RideGroupManager::RideTypeIsIndependent(item.type))
         {
-            get_ride_entry_name(entry, item.entry_index);
-            entryPtr = entry;
+            entryName = get_ride_entry_name(item.entry_index);
         }
     }
 
-    ITrackDesignRepository* repo = OpenRCT2::GetContext()->GetTrackDesignRepository();
-
+    auto repo = OpenRCT2::GetContext()->GetTrackDesignRepository();
     if (rideEntry != nullptr && RideGroupManager::RideTypeHasRideGroups(item.type))
     {
-        const RideGroup* rideGroup = RideGroupManager::GetRideGroup(item.type, rideEntry);
-        return (int32_t)repo->GetCountForRideGroup(item.type, rideGroup);
+        auto rideGroup = RideGroupManager::GetRideGroup(item.type, rideEntry);
+        if (rideGroup != nullptr)
+        {
+            return (int32_t)repo->GetCountForRideGroup(item.type, rideGroup);
+        }
     }
-    else
-    {
-        return (int32_t)repo->GetCountForObjectEntry(item.type, String::ToStd(entryPtr));
-    }
+    return (int32_t)repo->GetCountForObjectEntry(item.type, entryName);
 }
 
 /**

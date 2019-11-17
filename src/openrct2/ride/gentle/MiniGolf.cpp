@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -673,8 +673,11 @@ static void paint_mini_golf_station(
     paint_session* session, ride_id_t rideIndex, uint8_t trackSequence, uint8_t direction, int32_t height,
     const TileElement* tileElement)
 {
-    LocationXY16 position = session->MapPosition;
-    Ride* ride = get_ride(rideIndex);
+    auto ride = get_ride(rideIndex);
+    if (ride == nullptr)
+        return;
+
+    CoordsXY position = session->MapPosition;
     auto stationObj = ride_get_station_object(ride);
     uint32_t imageId;
     bool hasFence;
@@ -824,7 +827,7 @@ static void paint_mini_golf_hole_ab(
     paint_session* session, uint8_t trackSequence, uint8_t direction, int32_t height, const uint32_t sprites[4][2][2])
 {
     uint32_t imageId;
-    LocationXY16 boundBox, boundBoxOffset;
+    CoordsXY boundBox, boundBoxOffset;
 
     bool drewSupports = wooden_a_supports_paint_setup(
         session, (direction & 1), 0, height, session->TrackColours[SCHEME_SUPPORTS], nullptr);
@@ -892,7 +895,7 @@ static void paint_mini_golf_hole_c(
     const TileElement* tileElement)
 {
     uint32_t imageId;
-    LocationXY16 boundBox, boundBoxOffset;
+    CoordsXY boundBox, boundBoxOffset;
 
     bool drewSupports = wooden_a_supports_paint_setup(
         session, (direction & 1), 0, height, session->TrackColours[SCHEME_SUPPORTS], nullptr);
@@ -959,7 +962,7 @@ static void paint_mini_golf_hole_d(
     const TileElement* tileElement)
 {
     uint32_t imageId;
-    LocationXY16 boundBox, boundBoxOffset;
+    CoordsXY boundBox, boundBoxOffset;
 
     int32_t supportType = (direction & 1);
     if (trackSequence == 2)
@@ -1049,7 +1052,7 @@ static void paint_mini_golf_hole_e(
     const TileElement* tileElement)
 {
     uint32_t imageId;
-    LocationXY16 boundBox, boundBoxOffset;
+    CoordsXY boundBox, boundBoxOffset;
 
     int32_t supportType = (direction & 1);
     if (trackSequence == 2)
@@ -1193,7 +1196,7 @@ void vehicle_visual_mini_golf_player(
         return;
     }
 
-    rct_drawpixelinfo* edi = session->DPI;
+    rct_drawpixelinfo* edi = &session->DPI;
     if (edi->zoom_level >= 2)
     {
         return;
@@ -1204,7 +1207,14 @@ void vehicle_visual_mini_golf_player(
         return;
     }
 
-    rct_ride_entry* rideEntry = get_ride_entry(get_ride(vehicle->ride)->subtype);
+    auto ride = get_ride(vehicle->ride);
+    if (ride == nullptr)
+        return;
+
+    auto rideEntry = ride->GetRideEntry();
+    if (rideEntry == nullptr)
+        return;
+
     rct_sprite* sprite = get_sprite(vehicle->peep[0]);
 
     uint8_t frame = mini_golf_peep_animation_frames[vehicle->mini_golf_current_animation][vehicle->animation_frame];
@@ -1226,7 +1236,7 @@ void vehicle_visual_mini_golf_ball(
         return;
     }
 
-    rct_drawpixelinfo* edi = session->DPI;
+    rct_drawpixelinfo* edi = &session->DPI;
     if (edi->zoom_level >= 1)
     {
         return;
@@ -1237,8 +1247,13 @@ void vehicle_visual_mini_golf_ball(
         return;
     }
 
-    Ride* ride = get_ride(vehicle->ride);
-    rct_ride_entry* rideEntry = get_ride_entry(ride->subtype);
+    auto ride = get_ride(vehicle->ride);
+    if (ride == nullptr)
+        return;
+
+    auto rideEntry = ride->GetRideEntry();
+    if (rideEntry == nullptr)
+        return;
 
     uint32_t image_id = rideEntry->vehicles[0].base_image_id;
     sub_98197C(session, image_id, 0, 0, 1, 1, 0, z, 0, 0, z + 3);

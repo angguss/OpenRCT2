@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -40,7 +40,7 @@ void sprite_paint_setup(paint_session* session, const uint16_t x, const uint16_t
         return;
     }
 
-    rct_drawpixelinfo* dpi = session->DPI;
+    rct_drawpixelinfo* dpi = &session->DPI;
     if (dpi->zoom_level > 2)
     {
         return;
@@ -57,7 +57,7 @@ void sprite_paint_setup(paint_session* session, const uint16_t x, const uint16_t
         {
             if (spr->generic.sprite_identifier == SPRITE_IDENTIFIER_PEEP)
             {
-                rct_peep* peep = (rct_peep*)spr;
+                Peep* peep = (Peep*)spr;
                 if (!(peep->type == PEEP_TYPE_STAFF && peep->staff_type == STAFF_TYPE_HANDYMAN))
                 {
                     continue;
@@ -89,7 +89,7 @@ void sprite_paint_setup(paint_session* session, const uint16_t x, const uint16_t
             }
         }
 
-        dpi = session->DPI;
+        dpi = &session->DPI;
 
         if (dpi->y + dpi->height <= spr->generic.sprite_top || spr->generic.sprite_bottom <= dpi->y
             || dpi->x + dpi->width <= spr->generic.sprite_left || spr->generic.sprite_right <= dpi->x)
@@ -113,7 +113,7 @@ void sprite_paint_setup(paint_session* session, const uint16_t x, const uint16_t
                 vehicle_paint(session, (rct_vehicle*)spr, image_direction);
                 break;
             case SPRITE_IDENTIFIER_PEEP:
-                peep_paint(session, (rct_peep*)spr, image_direction);
+                peep_paint(session, (Peep*)spr, image_direction);
                 break;
             case SPRITE_IDENTIFIER_MISC:
                 misc_paint(session, spr, image_direction);

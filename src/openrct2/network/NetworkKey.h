@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,6 +16,7 @@
 
 #    include <memory>
 #    include <string>
+#    include <vector>
 
 interface IStream;
 
@@ -37,8 +38,8 @@ public:
     std::string PublicKeyString();
     std::string PublicKeyHash();
     void Unload();
-    bool Sign(const uint8_t* md, const size_t len, char** signature, size_t* out_size);
-    bool Verify(const uint8_t* md, const size_t len, const char* sig, const size_t siglen);
+    bool Sign(const uint8_t* md, const size_t len, std::vector<uint8_t>& signature);
+    bool Verify(const uint8_t* md, const size_t len, const std::vector<uint8_t>& signature);
 
 private:
     NetworkKey(const NetworkKey&) = delete;

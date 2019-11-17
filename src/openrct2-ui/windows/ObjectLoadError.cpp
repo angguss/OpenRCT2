@@ -30,10 +30,34 @@ class ObjectDownloader
 private:
     static constexpr auto OPENRCT2_API_LEGACY_OBJECT_URL = "https://api.openrct2.io/objects/legacy/";
 
+    struct DownloadStatusInfo
+    {
+        std::string Name;
+        std::string Source;
+        size_t Count{};
+        size_t Total{};
+
+        bool operator==(const DownloadStatusInfo& rhs)
+        {
+            return Name == rhs.Name && Source == rhs.Source && Count == rhs.Count && Total == rhs.Total;
+        }
+        bool operator!=(const DownloadStatusInfo& rhs)
+        {
+            return !(*this == rhs);
+        }
+    };
+
     std::vector<rct_object_entry> _entries;
     std::vector<rct_object_entry> _downloadedEntries;
     size_t _currentDownloadIndex{};
     std::mutex _downloadedEntriesMutex;
+    std::mutex _queueMutex;
+    bool _nextDownloadQueued{};
+
+    DownloadStatusInfo _lastDownloadStatusInfo;
+    DownloadStatusInfo _downloadStatusInfo;
+    std::mutex _downloadStatusInfoMutex;
+    std::string _lastDownloadSource;
 
     // TODO static due to INTENT_EXTRA_CALLBACK not allowing a std::function
     inline static bool _downloadingObjects;
@@ -41,10 +65,13 @@ private:
 public:
     void Begin(const std::vector<rct_object_entry>& entries)
     {
+        _lastDownloadStatusInfo = {};
+        _downloadStatusInfo = {};
+        _lastDownloadSource = {};
         _entries = entries;
         _currentDownloadIndex = 0;
         _downloadingObjects = true;
-        NextDownload();
+        QueueNextDownload();
     }
 
     bool IsDownloading() const
@@ -58,27 +85,76 @@ public:
         return _downloadedEntries;
     }
 
-private:
-    void UpdateProgress(const std::string& name, size_t count, size_t total)
+    void Update()
     {
-        char str_downloading_objects[256];
-        set_format_arg(0, int16_t, count);
-        set_format_arg(2, int16_t, total);
-        set_format_arg(4, char*, name.c_str());
-
-        format_string(str_downloading_objects, sizeof(str_downloading_objects), STR_DOWNLOADING_OBJECTS, gCommonFormatArgs);
-
-        auto intent = Intent(WC_NETWORK_STATUS);
-        intent.putExtra(INTENT_EXTRA_MESSAGE, std::string(str_downloading_objects));
-        intent.putExtra(INTENT_EXTRA_CALLBACK, []() -> void { _downloadingObjects = false; });
-        context_open_intent(&intent);
+        std::lock_guard guard(_queueMutex);
+        if (_nextDownloadQueued)
+        {
+            _nextDownloadQueued = false;
+            NextDownload();
+        }
+        UpdateStatusBox();
     }
 
-    void DownloadObject(const rct_object_entry& entry, const std::string name, const std::string_view url)
+private:
+    void UpdateStatusBox()
     {
-        using namespace OpenRCT2::Network;
+        std::lock_guard<std::mutex> guard(_downloadStatusInfoMutex);
+        if (_lastDownloadStatusInfo != _downloadStatusInfo)
+        {
+            _lastDownloadStatusInfo = _downloadStatusInfo;
+
+            if (_downloadStatusInfo == DownloadStatusInfo())
+            {
+                context_force_close_window_by_class(WC_NETWORK_STATUS);
+            }
+            else
+            {
+                char str_downloading_objects[256]{};
+                uint8_t args[32]{};
+                if (_downloadStatusInfo.Source.empty())
+                {
+                    set_format_arg_on(args, 0, int16_t, (int16_t)_downloadStatusInfo.Count);
+                    set_format_arg_on(args, 2, int16_t, (int16_t)_downloadStatusInfo.Total);
+                    set_format_arg_on(args, 4, char*, _downloadStatusInfo.Name.c_str());
+                    format_string(str_downloading_objects, sizeof(str_downloading_objects), STR_DOWNLOADING_OBJECTS, args);
+                }
+                else
+                {
+                    set_format_arg_on(args, 0, char*, _downloadStatusInfo.Name.c_str());
+                    set_format_arg_on(args, sizeof(char*), char*, _downloadStatusInfo.Source.c_str());
+                    set_format_arg_on(args, sizeof(char*) + sizeof(char*), int16_t, (int16_t)_downloadStatusInfo.Count);
+                    set_format_arg_on(
+                        args, sizeof(char*) + sizeof(char*) + sizeof(int16_t), int16_t, (int16_t)_downloadStatusInfo.Total);
+                    format_string(str_downloading_objects, sizeof(str_downloading_objects), STR_DOWNLOADING_OBJECTS_FROM, args);
+                }
+
+                auto intent = Intent(WC_NETWORK_STATUS);
+                intent.putExtra(INTENT_EXTRA_MESSAGE, std::string(str_downloading_objects));
+                intent.putExtra(INTENT_EXTRA_CALLBACK, []() -> void { _downloadingObjects = false; });
+                context_open_intent(&intent);
+            }
+        }
+    }
+
+    void UpdateProgress(const DownloadStatusInfo& info)
+    {
+        std::lock_guard<std::mutex> guard(_downloadStatusInfoMutex);
+        _downloadStatusInfo = info;
+    }
+
+    void QueueNextDownload()
+    {
+        std::lock_guard guard(_queueMutex);
+        _nextDownloadQueued = true;
+    }
+
+    void DownloadObject(const rct_object_entry& entry, const std::string name, const std::string url)
+    {
+        using namespace OpenRCT2::Networking;
         try
         {
+            std::printf("Downloading %s\n", url.c_str());
             Http::Request req;
             req.method = Http::Method::GET;
             req.url = url;
@@ -100,35 +176,35 @@ private:
                 }
                 else
                 {
-                    throw std::runtime_error("Non 200 status");
+                    std::printf("  Failed to download %s\n", name.c_str());
                 }
-                NextDownload();
+                QueueNextDownload();
             });
         }
         catch (const std::exception&)
         {
             std::printf("  Failed to download %s\n", name.c_str());
-            NextDownload();
+            QueueNextDownload();
         }
     }
 
     void NextDownload()
     {
-        using namespace OpenRCT2::Network;
+        using namespace OpenRCT2::Networking;
 
         if (!_downloadingObjects || _currentDownloadIndex >= _entries.size())
         {
             // Finished...
             _downloadingObjects = false;
-            context_force_close_window_by_class(WC_NETWORK_STATUS);
+            UpdateProgress({});
             return;
         }
 
         auto& entry = _entries[_currentDownloadIndex];
         auto name = String::Trim(std::string(entry.name, sizeof(entry.name)));
-        UpdateProgress(name, _currentDownloadIndex + 1, (int32_t)_entries.size());
-        std::printf("Downloading %s...\n", name.c_str());
+        log_verbose("Downloading object: [%s]:", name.c_str());
         _currentDownloadIndex++;
+        UpdateProgress({ name, _lastDownloadSource, _currentDownloadIndex, _entries.size() });
         try
         {
             Http::Request req;
@@ -141,9 +217,12 @@ private:
                     if (jresponse != nullptr)
                     {
                         auto objName = json_string_value(json_object_get(jresponse, "name"));
+                        auto source = json_string_value(json_object_get(jresponse, "source"));
                         auto downloadLink = json_string_value(json_object_get(jresponse, "download"));
                         if (downloadLink != nullptr)
                         {
+                            _lastDownloadSource = source;
+                            UpdateProgress({ name, source, _currentDownloadIndex, _entries.size() });
                             DownloadObject(entry, objName, downloadLink);
                         }
                         json_decref(jresponse);
@@ -152,12 +231,12 @@ private:
                 else if (response.status == Http::Status::NotFound)
                 {
                     std::printf("  %s not found\n", name.c_str());
-                    NextDownload();
+                    QueueNextDownload();
                 }
                 else
                 {
                     std::printf("  %s query failed (status %d)\n", name.c_str(), (int32_t)response.status);
-                    NextDownload();
+                    QueueNextDownload();
                 }
             });
         }
@@ -184,13 +263,12 @@ enum WINDOW_OBJECT_LOAD_ERROR_WIDGET_IDX {
     WIDX_DOWNLOAD_ALL
 };
 
-#define WW 450
-#define WH 400
-#define WW_LESS_PADDING (WW - 5)
-#define NAME_COL_LEFT 4
-#define SOURCE_COL_LEFT ((WW_LESS_PADDING / 4) + 1)
-#define TYPE_COL_LEFT (5 * WW_LESS_PADDING / 8 + 1)
-#define LIST_ITEM_HEIGHT 10
+constexpr int32_t WW = 450;
+constexpr int32_t WH = 400;
+constexpr int32_t WW_LESS_PADDING = WW - 5;
+constexpr int32_t NAME_COL_LEFT = 4;
+constexpr int32_t SOURCE_COL_LEFT = (WW_LESS_PADDING / 4) + 1;
+constexpr int32_t TYPE_COL_LEFT = 5 * WW_LESS_PADDING / 8 + 1;
 
 static rct_widget window_object_load_error_widgets[] = {
     { WWT_FRAME,             0, 0,               WW - 1,                0,          WH - 1,     STR_NONE,                       STR_NONE },                // Background
@@ -213,8 +291,8 @@ static void window_object_load_error_close(rct_window *w);
 static void window_object_load_error_update(rct_window *w);
 static void window_object_load_error_mouseup(rct_window *w, rct_widgetindex widgetIndex);
 static void window_object_load_error_scrollgetsize(rct_window *w, int32_t scrollIndex, int32_t *width, int32_t *height);
-static void window_object_load_error_scrollmouseover(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
-static void window_object_load_error_scrollmousedown(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
+static void window_object_load_error_scrollmouseover(rct_window *w, int32_t scrollIndex, ScreenCoordsXY screenCoords);
+static void window_object_load_error_scrollmousedown(rct_window *w, int32_t scrollIndex, ScreenCoordsXY screenCoords);
 static void window_object_load_error_paint(rct_window *w, rct_drawpixelinfo *dpi);
 static void window_object_load_error_scrollpaint(rct_window *w, rct_drawpixelinfo *dpi, int32_t scrollIndex);
 #ifndef DISABLE_HTTP
@@ -339,7 +417,7 @@ static void copy_object_names_to_clipboard(rct_window* w)
         }
 
         strncat(buffer, _invalid_entries[i].name, nameLength);
-        strncat(buffer, PLATFORM_NEWLINE, line_sep_len);
+        strncat(buffer, PLATFORM_NEWLINE, buffer_len - strlen(buffer) - 1);
     }
 
     platform_place_string_on_clipboard(buffer);
@@ -370,7 +448,7 @@ rct_window* window_object_load_error_open(utf8* path, size_t numMissingObjects, 
     window->no_list_items = (uint16_t)numMissingObjects;
     file_path = path;
 
-    window_invalidate(window);
+    window->Invalidate();
     return window;
 }
 
@@ -392,6 +470,8 @@ static void window_object_load_error_update(rct_window* w)
     }
 
 #ifndef DISABLE_HTTP
+    _objDownloader.Update();
+
     // Remove downloaded objects from our invalid entry list
     if (_objDownloader.IsDownloading())
     {
@@ -439,11 +519,11 @@ static void window_object_load_error_mouseup(rct_window* w, rct_widgetindex widg
     }
 }
 
-static void window_object_load_error_scrollmouseover(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_object_load_error_scrollmouseover(rct_window* w, int32_t scrollIndex, ScreenCoordsXY screenCoords)
 {
     // Highlight item that the cursor is over, or remove highlighting if none
     int32_t selected_item;
-    selected_item = y / SCROLLABLE_ROW_HEIGHT;
+    selected_item = screenCoords.y / SCROLLABLE_ROW_HEIGHT;
     if (selected_item < 0 || selected_item >= w->no_list_items)
         highlighted_index = -1;
     else
@@ -465,10 +545,10 @@ static void window_object_load_error_select_element_from_list(rct_window* w, int
     widget_invalidate(w, WIDX_SCROLL);
 }
 
-static void window_object_load_error_scrollmousedown(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_object_load_error_scrollmousedown(rct_window* w, int32_t scrollIndex, ScreenCoordsXY screenCoords)
 {
     int32_t selected_item;
-    selected_item = y / SCROLLABLE_ROW_HEIGHT;
+    selected_item = screenCoords.y / SCROLLABLE_ROW_HEIGHT;
     window_object_load_error_select_element_from_list(w, selected_item);
 }
 

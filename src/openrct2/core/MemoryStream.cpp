@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -49,6 +49,11 @@ MemoryStream::MemoryStream(const void* data, size_t dataSize)
 {
 }
 
+MemoryStream::MemoryStream(MemoryStream&& mv)
+{
+    *this = std::move(mv);
+}
+
 MemoryStream::~MemoryStream()
 {
     if (_access & MEMORY_ACCESS::OWNER)
@@ -58,6 +63,21 @@ MemoryStream::~MemoryStream()
     _dataCapacity = 0;
     _dataSize = 0;
     _data = nullptr;
+}
+
+MemoryStream& MemoryStream::operator=(MemoryStream&& mv)
+{
+    _access = mv._access;
+    _dataCapacity = mv._dataCapacity;
+    _data = mv._data;
+    _position = mv._position;
+
+    mv._data = nullptr;
+    mv._position = nullptr;
+    mv._dataCapacity = 0;
+    mv._dataSize = 0;
+
+    return *this;
 }
 
 const void* MemoryStream::GetData() const
@@ -135,8 +155,33 @@ void MemoryStream::Read(void* buffer, uint64_t length)
         throw IOException("Attempted to read past end of stream.");
     }
 
-    std::copy_n((const uint8_t*)_position, length, (uint8_t*)buffer);
+    std::memcpy(buffer, _position, length);
     _position = (void*)((uintptr_t)_position + length);
+}
+
+void MemoryStream::Read1(void* buffer)
+{
+    Read<1>(buffer);
+}
+
+void MemoryStream::Read2(void* buffer)
+{
+    Read<2>(buffer);
+}
+
+void MemoryStream::Read4(void* buffer)
+{
+    Read<4>(buffer);
+}
+
+void MemoryStream::Read8(void* buffer)
+{
+    Read<8>(buffer);
+}
+
+void MemoryStream::Read16(void* buffer)
+{
+    Read<16>(buffer);
 }
 
 uint64_t MemoryStream::TryRead(void* buffer, uint64_t length)
@@ -163,9 +208,34 @@ void MemoryStream::Write(const void* buffer, uint64_t length)
         }
     }
 
-    std::copy_n((const uint8_t*)buffer, length, (uint8_t*)_position);
+    std::memcpy(_position, buffer, length);
     _position = (void*)((uintptr_t)_position + length);
     _dataSize = std::max<size_t>(_dataSize, (size_t)nextPosition);
+}
+
+void MemoryStream::Write1(const void* buffer)
+{
+    Write<1>(buffer);
+}
+
+void MemoryStream::Write2(const void* buffer)
+{
+    Write<2>(buffer);
+}
+
+void MemoryStream::Write4(const void* buffer)
+{
+    Write<4>(buffer);
+}
+
+void MemoryStream::Write8(const void* buffer)
+{
+    Write<8>(buffer);
+}
+
+void MemoryStream::Write16(const void* buffer)
+{
+    Write<16>(buffer);
 }
 
 void MemoryStream::EnsureCapacity(size_t capacity)

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -783,8 +783,6 @@ static void paint_splash_boats_station(
     paint_session* session, ride_id_t rideIndex, uint8_t trackSequence, uint8_t direction, int32_t height,
     const TileElement* tileElement)
 {
-    Ride* ride = get_ride(rideIndex);
-
     if (direction & 1)
     {
         uint32_t imageId = (direction == 1 ? SPR_SPLASH_BOATS_FLAT_TOP_NW_SE : SPR_SPLASH_BOATS_FLAT_TOP_SE_NW)
@@ -806,7 +804,9 @@ static void paint_splash_boats_station(
 
     wooden_a_supports_paint_setup(session, (direction & 1), 0, height, session->TrackColours[SCHEME_SUPPORTS], nullptr);
 
-    track_paint_util_draw_station_platform(session, ride, direction, height, 7, tileElement);
+    auto ride = get_ride(rideIndex);
+    if (ride != nullptr)
+        track_paint_util_draw_station_platform(session, ride, direction, height, 7, tileElement);
 
     paint_util_push_tunnel_rotated(session, direction, height, TUNNEL_6);
 
@@ -1250,13 +1250,13 @@ void vehicle_visual_splash_boats_or_water_coaster(
     paint_session* session, int32_t x, int32_t imageDirection, int32_t y, int32_t z, const rct_vehicle* vehicle,
     const rct_ride_entry_vehicle* vehicleEntry)
 {
-    if (vehicle->is_child)
+    if (vehicle->IsHead())
     {
-        vehicle = GET_VEHICLE(vehicle->prev_vehicle_on_ride);
+        vehicle = GET_VEHICLE(vehicle->next_vehicle_on_ride);
     }
     else
     {
-        vehicle = GET_VEHICLE(vehicle->next_vehicle_on_ride);
+        vehicle = GET_VEHICLE(vehicle->prev_vehicle_on_ride);
     }
     session->CurrentlyDrawnItem = vehicle;
     imageDirection = ((session->CurrentRotation * 8) + vehicle->sprite_direction) & 0x1F;

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -33,10 +33,10 @@ enum {
     WIDX_SCROLL
 };
 
-#define WW 500
-#define WH 400
-#define MIN_WW 300
-#define MIN_WH 200
+constexpr int32_t WW = 500;
+constexpr int32_t WH = 400;
+constexpr int32_t MIN_WW = 300;
+constexpr int32_t MIN_WH = 200;
 
 static rct_widget window_changelog_widgets[] = {
     { WWT_FRAME,            0,  0,          WW - 1, 0,      WH - 1,     0xFFFFFFFF,                     STR_NONE },             // panel / background
@@ -148,12 +148,12 @@ static void window_changelog_resize(rct_window* w)
     w->min_height = MIN_WH;
     if (w->width < w->min_width)
     {
-        window_invalidate(w);
+        w->Invalidate();
         w->width = w->min_width;
     }
     if (w->height < w->min_height)
     {
-        window_invalidate(w);
+        w->Invalidate();
         w->height = w->min_height;
     }
 }
@@ -217,7 +217,7 @@ static std::string GetChangelogText()
     return File::ReadAllText(path);
 #else
 #if defined(_WIN32) && !defined(__MINGW32__)
-    auto pathW = String::ToUtf16(path);
+    auto pathW = String::ToWideChar(path);
     auto fs = std::ifstream(pathW, std::ios::in);
 #else
     auto fs = std::ifstream(path, std::ios::in);

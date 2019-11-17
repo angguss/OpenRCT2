@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -59,7 +59,7 @@ namespace File
         return result;
 #else
 #    if defined(_WIN32) && !defined(__MINGW32__)
-        auto pathW = String::ToUtf16(std::string(path));
+        auto pathW = String::ToWideChar(std::string(path));
         std::ifstream fs(pathW, std::ios::in | std::ios::binary);
 #    else
         std::ifstream fs(std::string(path), std::ios::in | std::ios::binary);
@@ -141,8 +141,8 @@ namespace File
         PHYSFS_stat(path.c_str(), &stat);
         lastModified = stat.modtime;
 #elif defined(_WIN32)
-        auto pathW = utf8_to_widechar(path.c_str());
-        auto hFile = CreateFileW(pathW, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+        auto pathW = String::ToWideChar(path.c_str());
+        auto hFile = CreateFileW(pathW.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
         if (hFile != INVALID_HANDLE_VALUE)
         {
             FILETIME ftCreate, ftAccess, ftWrite;
@@ -152,7 +152,6 @@ namespace File
             }
             CloseHandle(hFile);
         }
-        free(pathW);
 #else
         struct stat statInfo
         {

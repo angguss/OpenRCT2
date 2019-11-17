@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -27,6 +27,7 @@
 #define RCT1_MAX_STAFF 116
 #define RCT1_RESEARCH_FLAGS_SEPARATOR 0xFF
 #define RCT1_MAX_ANIMATED_OBJECTS 1000
+#define RCT1_MAX_BANNERS 100
 
 struct ParkLoadResult;
 
@@ -213,32 +214,10 @@ struct rct1_ride
 };
 assert_struct_size(rct1_ride, 0x260);
 
-struct rct1_unk_sprite
+struct rct1_unk_sprite : RCT12SpriteBase
 {
-    uint8_t sprite_identifier;       // 0x00
-    uint8_t misc_identifier;         // 0x01
-    uint16_t next_in_quadrant;       // 0x02
-    uint16_t next;                   // 0x04
-    uint16_t previous;               // 0x06
-    uint8_t linked_list_type_offset; // 0x08 Valid values are SPRITE_LINKEDLIST_OFFSET_...
-    // Height from centre of sprite to bottom
-    uint8_t sprite_height_negative; // 0x09
-    uint16_t sprite_index;          // 0x0A
-    uint16_t flags;                 // 0x0C
-    int16_t x;                      // 0x0E
-    int16_t y;                      // 0x10
-    int16_t z;                      // 0x12
-    // Width from centre of sprite to edge
-    uint8_t sprite_width; // 0x14
-    // Height from centre of sprite to top
-    uint8_t sprite_height_positive; // 0x15
-    int16_t sprite_left;            // 0x16
-    int16_t sprite_top;             // 0x18
-    int16_t sprite_right;           // 0x1A
-    int16_t sprite_bottom;          // 0x1C
-    uint8_t sprite_direction;       // direction of sprite? 0x1e
-    uint8_t pad_1F[3];              // 0x1f
-    rct_string_id name_string_idx;  // 0x22
+    uint8_t pad_1F[3];             // 0x1f
+    rct_string_id name_string_idx; // 0x22
     uint16_t var_24;
     uint16_t frame; // 0x26
     uint8_t var_28[3];
@@ -247,32 +226,10 @@ struct rct1_unk_sprite
     uint8_t var_71;
 };
 
-struct rct1_vehicle
+struct rct1_vehicle : RCT12SpriteBase
 {
-    uint8_t sprite_identifier;       // 0x00
-    uint8_t is_child;                // 0x01
-    uint16_t next_in_quadrant;       // 0x02
-    uint16_t next;                   // 0x04
-    uint16_t previous;               // 0x06
-    uint8_t linked_list_type_offset; // 0x08 Valid values are SPRITE_LINKEDLIST_OFFSET_...
-    // Height from centre of sprite to bottom
-    uint8_t sprite_height_negative; // 0x09
-    uint16_t sprite_index;          // 0x0A
-    uint16_t flags;                 // 0x0C
-    int16_t x;                      // 0x0E
-    int16_t y;                      // 0x10
-    int16_t z;                      // 0x12
-    // Width from centre of sprite to edge
-    uint8_t sprite_width; // 0x14
-    // Height from centre of sprite to top
-    uint8_t sprite_height_positive; // 0x15
-    int16_t sprite_left;            // 0x16
-    int16_t sprite_top;             // 0x18
-    int16_t sprite_right;           // 0x1A
-    int16_t sprite_bottom;          // 0x1C
-    uint8_t sprite_direction;       // 0x1E
-    uint8_t vehicle_sprite_type;    // 0x1F
-    uint8_t bank_rotation;          // 0x20
+    uint8_t vehicle_sprite_type; // 0x1F
+    uint8_t bank_rotation;       // 0x20
     uint8_t pad_21[3];
     int32_t remaining_distance; // 0x24
     int32_t velocity;           // 0x28
@@ -372,30 +329,8 @@ struct rct1_vehicle
     uint8_t colours_extended; // 0xD7
 };
 
-struct rct1_peep
+struct rct1_peep : RCT12SpriteBase
 {
-    uint8_t sprite_identifier;       // 0x00
-    uint8_t misc_identifier;         // 0x01
-    uint16_t next_in_quadrant;       // 0x02
-    uint16_t next;                   // 0x04
-    uint16_t previous;               // 0x06
-    uint8_t linked_list_type_offset; // 0x08 Valid values are SPRITE_LINKEDLIST_OFFSET_...
-    // Height from centre of sprite to bottom
-    uint8_t sprite_height_negative; // 0x09
-    uint16_t sprite_index;          // 0x0A
-    uint16_t flags;                 // 0x0C
-    int16_t x;                      // 0x0E
-    int16_t y;                      // 0x10
-    int16_t z;                      // 0x12
-    // Width from centre of sprite to edge
-    uint8_t sprite_width; // 0x14
-    // Height from centre of sprite to top
-    uint8_t sprite_height_positive; // 0x15
-    int16_t sprite_left;            // 0x16
-    int16_t sprite_top;             // 0x18
-    int16_t sprite_right;           // 0x1A
-    int16_t sprite_bottom;          // 0x1C
-    uint8_t sprite_direction;       // 0x1E
     uint8_t pad_1F[3];
     rct_string_id name_string_idx; // 0x22
     uint16_t next_x;               // 0x24
@@ -483,19 +418,19 @@ struct rct1_peep
     uint8_t rides_been_on[32]; // 0x7C
     // 255 bit bitmap of every ride the peep has been on see
     // window_peep_rides_update for how to use.
-    uint32_t id;                                  // 0x9C
-    money32 cash_in_pocket;                       // 0xA0
-    money32 cash_spent;                           // 0xA4
-    int32_t time_in_park;                         // 0xA8
-    int8_t rejoin_queue_timeout;                  // 0xAC
-    uint8_t previous_ride;                        // 0xAD
-    uint16_t previous_ride_time_out;              // 0xAE
-    rct_peep_thought thoughts[PEEP_MAX_THOUGHTS]; // 0xB0
+    uint32_t id;                                        // 0x9C
+    money32 cash_in_pocket;                             // 0xA0
+    money32 cash_spent;                                 // 0xA4
+    int32_t time_in_park;                               // 0xA8
+    int8_t rejoin_queue_timeout;                        // 0xAC
+    uint8_t previous_ride;                              // 0xAD
+    uint16_t previous_ride_time_out;                    // 0xAE
+    RCT12PeepThought thoughts[RCT12_PEEP_MAX_THOUGHTS]; // 0xB0
     uint8_t pad_C4;
     union
     {
-        uint8_t staff_id;                   // 0xC5
-        ride_id_t guest_heading_to_ride_id; // 0xC5
+        uint8_t staff_id;                 // 0xC5
+        uint8_t guest_heading_to_ride_id; // 0xC5
     };
     union
     {
@@ -578,14 +513,14 @@ union rct1_sprite
     rct1_unk_sprite unknown;
     rct1_vehicle vehicle;
     rct1_peep peep;
-    rct_litter litter;
-    rct_balloon balloon;
-    rct_sprite duck;
-    rct_jumping_fountain jumping_fountain;
-    rct_money_effect money_effect;
-    rct_crashed_vehicle_particle crashed_vehicle_particle;
-    rct_crash_splash crash_splash;
-    rct_steam_particle steam_particle;
+    RCT12SpriteLitter litter;
+    RCT12SpriteBalloon balloon;
+    RCT12SpriteDuck duck;
+    RCT12SpriteJumpingFountain jumping_fountain;
+    RCT12SpriteMoneyEffect money_effect;
+    RCT12SpriteCrashedVehicleParticle crashed_vehicle_particle;
+    RCT12SpriteCrashSplash crash_splash;
+    RCT12SpriteSteamParticle steam_particle;
 };
 assert_struct_size(rct1_sprite, 0x100);
 
@@ -731,7 +666,7 @@ struct rct1_s4
     uint16_t unk_199C9A;
     rct1_research_item research_items_LL[180];
     uint8_t unk_19A020[5468];
-    rct_banner banners[100];
+    RCT12Banner banners[RCT1_MAX_BANNERS];
     char string_table[RCT12_MAX_USER_STRINGS][RCT12_USER_STRING_MAX_LENGTH];
     uint32_t game_time_counter;
     rct1_ride rides[RCT12_MAX_RIDES_IN_PARK];
@@ -740,14 +675,14 @@ struct rct1_s4
     uint16_t view_y;
     uint8_t view_zoom;
     uint8_t view_rotation;
-    rct_map_animation map_animations[RCT1_MAX_ANIMATED_OBJECTS];
+    RCT12MapAnimation map_animations[RCT1_MAX_ANIMATED_OBJECTS];
     uint32_t num_map_animations;
     uint8_t unk_1CADBC[12];
     uint16_t scrolling_text_step;
     uint32_t unk_1CADCA;
     uint16_t unk_1CADCE;
     uint8_t unk_1CADD0[116];
-    rct_ride_measurement ride_measurements[8];
+    RCT12RideMeasurement ride_measurements[8];
     uint32_t next_guest_index;
     uint16_t game_counter_5;
     uint8_t patrol_areas[(RCT1_MAX_STAFF + RCT12_STAFF_TYPE_COUNT) * RCT12_PATROL_AREA_SIZE];
@@ -777,7 +712,7 @@ struct rct1_s4
 assert_struct_size(rct1_s4, 0x1F850C);
 
 /**
- * Track design structure.
+ * Track design structure. Only for base RCT1
  * size: 0x2006
  */
 struct rct_track_td4
@@ -820,18 +755,25 @@ struct rct_track_td4
     uint8_t intensity;           // 0x34
     uint8_t nausea;              // 0x35
     money16 upkeep_cost;         // 0x36
+};
 
-    // Added Attractions / Loopy Landscapes only
+assert_struct_size(rct_track_td4, 0x38);
+
+/**
+ * Track design structure for Added Attractions / Loopy Landscapes
+ * size: 0x2006
+ */
+struct rct_track_td4_aa : public rct_track_td4
+{
     uint8_t track_spine_colour[RCT12_NUM_COLOUR_SCHEMES];   // 0x38
     uint8_t track_rail_colour[RCT12_NUM_COLOUR_SCHEMES];    // 0x3C
     uint8_t track_support_colour[RCT12_NUM_COLOUR_SCHEMES]; // 0x40
     uint8_t flags2;                                         // 0x44
 
-    uint8_t var_45[0x7F]; // 0x45
-
-    void* elements; // 0xC4 (data starts here in file, 38 for original RCT1)
-    size_t elementsSize;
+    uint8_t pad_45[0x7F]; // 0x45
 };
+
+assert_struct_size(rct_track_td4_aa, 0xC4);
 #pragma pack(pop)
 
 enum

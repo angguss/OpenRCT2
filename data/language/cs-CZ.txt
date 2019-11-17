@@ -552,8 +552,8 @@ STR_1167    :Tady nelze zvýšit hladinu vody...
 STR_1168    :Nastavení
 STR_1169    :(None)
 STR_1170    :{STRING}
-STR_1171    :{RED}Zavřeno - - 
-STR_1172    :{YELLOW}{STRINGID} - - 
+STR_1171    :{RED}Zavřeno
+STR_1172    :{YELLOW}{STRINGID}
 STR_1173    :{SMALLFONT}{BLACK}Nástroj pro cesty a fronty
 STR_1174    :Banner v cestě
 STR_1175    :Toto nelze postavit na strmé cestě
@@ -1111,8 +1111,8 @@ STR_1726    :Pozemek není na prodej!
 STR_1727    :Stavební práva nejsou na prodej!
 STR_1728    :Tyto stavební práva nelze zakoupit...
 STR_1729    :Pozemek není ve vlastnictví parku!
-STR_1730    :{RED}Zavřeno - - 
-STR_1731    :{WHITE}{STRINGID} - - 
+STR_1730    :{RED}Zavřeno
+STR_1731    :{WHITE}{STRINGID}
 STR_1732    :Stavět
 STR_1733    :Mód
 STR_1734    :{WINDOW_COLOUR_2}Počet kol:
@@ -1863,39 +1863,14 @@ STR_2521    :Zobrazit seznam personálu
 STR_2522    :Zobrazit poslední zprávy
 STR_2523    :Zobrazit mapu
 STR_2524    :Snímek obrazovky
-### The following need to be reordered to match SDL_keycode layout.
-STR_2525    :???
-STR_2526    :???
-STR_2527    :???
-STR_2528    :???
-STR_2529    :???
-STR_2530    :???
-STR_2531    :???
-STR_2532    :???
 STR_2533    :Backspace
 STR_2534    :Tab
-STR_2535    :???
-STR_2536    :???
 STR_2537    :Clear
 STR_2538    :Return
-STR_2539    :???
-STR_2540    :???
-STR_2541    :???
-STR_2542    :???
 STR_2543    :Alt/Menu
 STR_2544    :Pause
 STR_2545    :Caps
-STR_2546    :???
-STR_2547    :???
-STR_2548    :???
-STR_2549    :???
-STR_2550    :???
-STR_2551    :???
 STR_2552    :Escape
-STR_2553    :???
-STR_2554    :???
-STR_2555    :???
-STR_2556    :???
 STR_2557    :Spacebar
 STR_2558    :PgUp
 STR_2559    :PgDn
@@ -1912,54 +1887,7 @@ STR_2569    :Snapshot
 STR_2570    :Insert
 STR_2571    :Delete
 STR_2572    :Help
-STR_2573    :0
-STR_2574    :1
-STR_2575    :2
-STR_2576    :3
-STR_2577    :4
-STR_2578    :5
-STR_2579    :6
-STR_2580    :7
-STR_2581    :8
-STR_2582    :9
-STR_2583    :???
-STR_2584    :???
-STR_2585    :???
-STR_2586    :???
-STR_2587    :???
-STR_2588    :???
-STR_2589    :???
-STR_2590    :A
-STR_2591    :B
-STR_2592    :C
-STR_2593    :D
-STR_2594    :E
-STR_2595    :F
-STR_2596    :G
-STR_2597    :H
-STR_2598    :I
-STR_2599    :J
-STR_2600    :K
-STR_2601    :L
-STR_2602    :M
-STR_2603    :N
-STR_2604    :O
-STR_2605    :P
-STR_2606    :Q
-STR_2607    :R
-STR_2608    :S
-STR_2609    :T
-STR_2610    :U
-STR_2611    :V
-STR_2612    :W
-STR_2613    :X
-STR_2614    :Y
-STR_2615    :Z
-STR_2616    :???
-STR_2617    :???
 STR_2618    :Menu
-STR_2619    :???
-STR_2620    :???
 STR_2621    :NumPad 0
 STR_2622    :NumPad 1
 STR_2623    :NumPad 2
@@ -1972,53 +1900,11 @@ STR_2629    :NumPad 8
 STR_2630    :NumPad 9
 STR_2631    :NumPad *
 STR_2632    :NumPad +
-STR_2633    :???
 STR_2634    :NumPad -
 STR_2635    :NumPad .
 STR_2636    :NumPad /
-STR_2637    :F1
-STR_2638    :F2
-STR_2639    :F3
-STR_2640    :F4
-STR_2641    :F5
-STR_2642    :F6
-STR_2643    :F7
-STR_2644    :F8
-STR_2645    :F9
-STR_2646    :F10
-STR_2647    :F11
-STR_2648    :F12
-STR_2649    :F13
-STR_2650    :F14
-STR_2651    :F15
-STR_2652    :F16
-STR_2653    :F17
-STR_2654    :F18
-STR_2655    :F19
-STR_2656    :F20
-STR_2657    :F21
-STR_2658    :F22
-STR_2659    :F23
-STR_2660    :F24
-STR_2661    :???
-STR_2662    :???
-STR_2663    :???
-STR_2664    :???
-STR_2665    :???
-STR_2666    :???
-STR_2667    :???
-STR_2668    :???
 STR_2669    :NumLock
 STR_2670    :Scroll
-STR_2671    :???
-STR_2672    :???
-STR_2673    :???
-STR_2674    :???
-STR_2675    :???
-STR_2676    :???
-STR_2677    :???
-STR_2678    :???
-STR_2679    :???
 STR_2680    :Všechen výzkum byl dokončen
 STR_2681    :{MEDIUMFONT}{BLACK}Přidat {CURRENCY} hotovosti
 STR_2684    :{SMALLFONT}{BLACK}Dorazí velká skupina návštěvníků
@@ -2034,9 +1920,6 @@ STR_2693    :Terén:
 STR_2694    :Generovat
 STR_2695    :Náhodný terén
 STR_2696    :Umístit stromy
-STR_2697    :???
-STR_2698    :???
-STR_2699    :???
 STR_2700    :Frekvence autoukládání:
 STR_2701    :každou minutu
 STR_2702    :každých 5 minut
@@ -2048,13 +1931,6 @@ STR_2707    :Použít systémového průzkumníka souborů
 STR_2708    :{WINDOW_COLOUR_1}Opravdu chcete přepsat {STRINGID}?
 STR_2709    :Přepsat
 STR_2710    :Napište název souboru.
-STR_2711    :;
-STR_2712    :=
-STR_2713    :,
-STR_2714    :-
-STR_2715    :.
-STR_2716    :/
-STR_2717    :'
 STR_2718    :(up)
 STR_2719    :(new file)
 STR_2720    :{UINT16}s
@@ -2081,10 +1957,6 @@ STR_2740    :RollerCoaster Tycoon 1
 STR_2741    :RollerCoaster Tycoon 2
 STR_2742    :css50.dat nenalezen
 STR_2743    :Nakopírujte „data/css17.dat“ z vaší instalace RCT1 do „data/css50.dat“ ve vaší instalaci RCT2, nebo se přesvědčte, že cesta k instalaci RCT1 je správně nastavena v záložce „Pokročilé“.
-STR_2744    :[
-STR_2745    :\
-STR_2746    :]
-STR_2747    :”
 STR_2749    :Můj nový scénář
 # New strings used in the cheats window previously these were ???
 STR_2750    :Posunout všechny položky nahoru
@@ -2242,7 +2114,7 @@ STR_2977    :Přejmenovat zaměstnance
 STR_2978    :Zadejte nové jméno tohoto zaměstnance:
 STR_2979    :Nelze přejmenovat zaměstnance...
 STR_2980    :Příliš mnoho bannerů ve hře
-STR_2981    :{RED}Zákaz vstupu - - 
+STR_2981    :{RED}Zákaz vstupu
 STR_2982    :Text banneru
 STR_2983    :Zadejte nový text banneru:
 STR_2984    :Nelze změnit text banneru...
@@ -2433,7 +2305,6 @@ STR_3190    :Doplňky cest
 STR_3191    :Skupiny kulis
 STR_3192    :Vstup do parku
 STR_3193    :Voda
-STR_3194    :Popis scénáře
 STR_3195    :Seznam výzkumů
 STR_3196    :{WINDOW_COLOUR_2}Skupina výzkumu: {BLACK}{STRINGID}
 STR_3197    :{WINDOW_COLOUR_2}Položky vyzkoumané před začátkem hry:
@@ -3236,7 +3107,7 @@ STR_5762    :Čínský jüan (CN¥)
 STR_5763    :Všechny soubory
 STR_5764    :Neplatný typ atrakce
 STR_5765    :Nelze upravovat atrakce neplatného typu
-STR_5766    :<available string id>
+STR_5766    :Maďarský Forint (Ft)
 STR_5767    :Příjem
 STR_5768    :Celkem zákazníků
 STR_5769    :Celkový zisk
@@ -3745,7 +3616,7 @@ STR_6273    :Hudba
 STR_6274    :Nelze nastavit schéma barev...
 STR_6275    :{WINDOW_COLOUR_2}Styl stanice:
 STR_6276    :{RED}Na atrakci {STRINGID} se zasekávají návštěvníci, zkontrolujte typ atrakce a mód provozu.
-STR_6277    :{WINDOW_COLOUR_2}Index stanice: {BLACK}{COMMA16}
+STR_6277    :{WINDOW_COLOUR_2}Index stanice: {BLACK}{STRINGID}
 STR_6278    :Počet autouložení
 STR_6279    :{SMALLFONT}{BLACK}Maximální počet autouložených her
 STR_6280    :{SMALLFONT}{BLACK}Chat
@@ -3772,6 +3643,35 @@ STR_6300    :{SMALLFONT}{BLACK}Stáhnout všechny chybějící objekty dostupné
 STR_6301    :{SMALLFONT}{BLACK}Kopírovat název vybraného objektu do schránky.
 STR_6302    :{SMALLFONT}{BLACK}Kopírovat seznam objektů do schránky
 STR_6303    :Stahování objektu ({COMMA16} / {COMMA16}): [{STRING}]
+STR_6304    :Otevřít výběr kulis
+STR_6305    :Multithreading
+STR_6306    :{SMALLFONT}{BLACK}Experimentální podpora více vláken pro vykreslování obrazu, může způsobit nestabilitu.
+STR_6307    :Barevné schéma: {BLACK}{STRINGID}
+STR_6308    :“{STRINGID}{OUTLINE}{TOPAZ}”{NEWLINE}{STRINGID}
+STR_6309    :Znovu připojit
+STR_6310    :{WINDOW_COLOUR_2}Pozice: {BLACK}{INT32} {INT32} {INT32}
+STR_6311    :{WINDOW_COLOUR_2}Další: {BLACK}{INT32} {INT32} {INT32}
+STR_6312    :(povrch)
+STR_6313    :(sklon {INT32})
+STR_6314    :{WINDOW_COLOUR_2}Cíl: {BLACK}{INT32}, {INT32} tolerance {INT32}
+STR_6315    :{WINDOW_COLOUR_2}Cíl hledání cesty: {BLACK}{INT32}, {INT32}, {INT32} směr {INT32}
+STR_6316    :{WINDOW_COLOUR_2}Historie hledání cest:
+STR_6317    :{BLACK}{INT32}, {INT32}, {INT32} směr {INT32}
+STR_6318    :Detekována síťová desynchronizace.{NEWLINE}Log: {STRING}
+STR_6319    :{WINDOW_COLOUR_2}Uzavřený brzdný blok
+STR_6320    :{WINDOW_COLOUR_2}Nezničitelné
+STR_6321    :{WINDOW_COLOUR_2}Rozbitá část
+STR_6322    :{WINDOW_COLOUR_2}Sprite Id: {BLACK}{INT32}
+STR_6323    :Probíhá simulace
+STR_6324    :Simulovat
+STR_6325    :{SMALLFONT}{BLACK}Simulovat atrakci
+STR_6326    :Nelze simulovat {POP16}{POP16}{POP16}{STRINGID}...
+STR_6327    :Průhledné pozadí pro velké screenshoty
+STR_6328    :{SMALLFONT}{BLACK}Velké snímky obrazovky budou mít průhledné pozadí namísto výchozí černé barvy.
+STR_6329    :{STRING}{STRINGID}
+STR_6330    :Stahování [{STRING}] od {STRING} ({COMMA16} / {COMMA16})
+STR_6331    :Přivolat kachny
+STR_6332    :Zmizet kachny
 
 ###############################################################################
 ## RCT2 Scenarios

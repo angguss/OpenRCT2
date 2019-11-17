@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -34,12 +34,15 @@ private:
 public:
     MemoryStream() = default;
     MemoryStream(const MemoryStream& copy);
+    MemoryStream(MemoryStream&& mv);
     explicit MemoryStream(size_t capacity);
     MemoryStream(void* data, size_t dataSize, uint8_t access = MEMORY_ACCESS::READ);
     MemoryStream(const void* data, size_t dataSize);
     virtual ~MemoryStream();
 
-    const void* GetData() const;
+    MemoryStream& operator=(MemoryStream&& mv);
+
+    const void* GetData() const override;
     void* GetDataCopy() const;
     void* TakeData();
 
@@ -55,7 +58,51 @@ public:
     void Seek(int64_t offset, int32_t origin) override;
 
     void Read(void* buffer, uint64_t length) override;
+    void Read1(void* buffer) override;
+    void Read2(void* buffer) override;
+    void Read4(void* buffer) override;
+    void Read8(void* buffer) override;
+    void Read16(void* buffer) override;
+
+    template<size_t N> void Read(void* buffer)
+    {
+        uint64_t position = GetPosition();
+        if (position + N > _dataSize)
+        {
+            throw IOException("Attempted to read past end of stream.");
+        }
+
+        std::memcpy(buffer, _position, N);
+        _position = (void*)((uintptr_t)_position + N);
+    }
+
     void Write(const void* buffer, uint64_t length) override;
+    void Write1(const void* buffer) override;
+    void Write2(const void* buffer) override;
+    void Write4(const void* buffer) override;
+    void Write8(const void* buffer) override;
+    void Write16(const void* buffer) override;
+
+    template<size_t N> void Write(const void* buffer)
+    {
+        uint64_t position = GetPosition();
+        uint64_t nextPosition = position + N;
+        if (nextPosition > _dataCapacity)
+        {
+            if (_access & MEMORY_ACCESS::OWNER)
+            {
+                EnsureCapacity((size_t)nextPosition);
+            }
+            else
+            {
+                throw IOException("Attempted to write past end of stream.");
+            }
+        }
+
+        std::memcpy(_position, buffer, N);
+        _position = (void*)((uintptr_t)_position + N);
+        _dataSize = std::max<size_t>(_dataSize, (size_t)nextPosition);
+    }
 
     uint64_t TryRead(void* buffer, uint64_t length) override;
 

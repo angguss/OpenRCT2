@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,11 +15,11 @@
 #include <openrct2/drawing/Drawing.h>
 #include <openrct2/localisation/Localisation.h>
 
-#define WW 420
-#define WH 280
+constexpr int32_t WW = 420;
+constexpr int32_t WH = 280;
 
-#define WW_SC_MAX 1200
-#define WH_SC_MAX 800
+constexpr int32_t WW_SC_MAX = 1200;
+constexpr int32_t WH_SC_MAX = 800;
 
 // clang-format off
 enum WINDOW_SHORTCUT_WIDGET_IDX {
@@ -45,8 +45,8 @@ static void window_shortcut_resize(rct_window *w);
 static void window_shortcut_invalidate(rct_window *w);
 static void window_shortcut_paint(rct_window *w, rct_drawpixelinfo *dpi);
 static void window_shortcut_scrollgetsize(rct_window *w, int32_t scrollIndex, int32_t *width, int32_t *height);
-static void window_shortcut_scrollmousedown(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
-static void window_shortcut_scrollmouseover(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
+static void window_shortcut_scrollmousedown(rct_window *w, int32_t scrollIndex, ScreenCoordsXY screenCoords);
+static void window_shortcut_scrollmouseover(rct_window *w, int32_t scrollIndex, ScreenCoordsXY screenCoords);
 static void window_shortcut_scrollpaint(rct_window *w, rct_drawpixelinfo *dpi, int32_t scrollIndex);
 
 static rct_window_event_list window_shortcut_events = {
@@ -150,6 +150,7 @@ const rct_string_id ShortcutStringIds[SHORTCUT_COUNT] = {
     STR_SHORTCUT_HIGHLIGHT_PATH_ISSUES_TOGGLE,
     STR_SHORTCUT_OPEN_TILE_INSPECTOR,
     STR_ADVANCE_TO_NEXT_TICK,
+    STR_SHORTCUT_OPEN_SCENERY_PICKER,
 };
 // clang-format on
 
@@ -192,7 +193,7 @@ static void window_shortcut_mouseup(rct_window* w, rct_widgetindex widgetIndex)
         case WIDX_RESET:
             keyboard_shortcuts_reset();
             keyboard_shortcuts_save();
-            window_invalidate(w);
+            w->Invalidate();
             break;
     }
 }
@@ -237,9 +238,9 @@ static void window_shortcut_scrollgetsize(rct_window* w, int32_t scrollIndex, in
  *
  *  rct2: 0x006E3A3E
  */
-static void window_shortcut_scrollmousedown(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_shortcut_scrollmousedown(rct_window* w, int32_t scrollIndex, ScreenCoordsXY screenCoords)
 {
-    int32_t selected_item = (y - 1) / SCROLLABLE_ROW_HEIGHT;
+    int32_t selected_item = (screenCoords.y - 1) / SCROLLABLE_ROW_HEIGHT;
     if (selected_item >= w->no_list_items)
         return;
 
@@ -250,15 +251,15 @@ static void window_shortcut_scrollmousedown(rct_window* w, int32_t scrollIndex, 
  *
  *  rct2: 0x006E3A16
  */
-static void window_shortcut_scrollmouseover(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_shortcut_scrollmouseover(rct_window* w, int32_t scrollIndex, ScreenCoordsXY screenCoords)
 {
-    int32_t selected_item = (y - 1) / SCROLLABLE_ROW_HEIGHT;
+    int32_t selected_item = (screenCoords.y - 1) / SCROLLABLE_ROW_HEIGHT;
     if (selected_item >= w->no_list_items)
         return;
 
     w->selected_list_item = selected_item;
 
-    window_invalidate(w);
+    w->Invalidate();
 }
 
 /**

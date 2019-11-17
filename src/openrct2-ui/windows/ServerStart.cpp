@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -7,18 +7,20 @@
  * OpenRCT2 is licensed under the GNU General Public License version 3.
  *****************************************************************************/
 
-#include "../interface/Theme.h"
+#ifndef DISABLE_NETWORK
 
-#include <openrct2-ui/interface/Widget.h>
-#include <openrct2-ui/windows/Window.h>
-#include <openrct2/Context.h>
-#include <openrct2/ParkImporter.h>
-#include <openrct2/config/Config.h>
-#include <openrct2/interface/Chat.h>
-#include <openrct2/localisation/Localisation.h>
-#include <openrct2/network/network.h>
-#include <openrct2/util/Util.h>
-#include <openrct2/windows/Intent.h>
+#    include "../interface/Theme.h"
+
+#    include <openrct2-ui/interface/Widget.h>
+#    include <openrct2-ui/windows/Window.h>
+#    include <openrct2/Context.h>
+#    include <openrct2/ParkImporter.h>
+#    include <openrct2/config/Config.h>
+#    include <openrct2/interface/Chat.h>
+#    include <openrct2/localisation/Localisation.h>
+#    include <openrct2/network/network.h>
+#    include <openrct2/util/Util.h>
+#    include <openrct2/windows/Intent.h>
 
 static char _port[7];
 static char _name[65];
@@ -44,8 +46,8 @@ enum {
     WIDX_LOAD_SERVER
 };
 
-#define WW 300
-#define WH 154
+constexpr int32_t WW = 300;
+constexpr int32_t WH = 154;
 
 static rct_widget window_server_start_widgets[] = {
     { WWT_FRAME,            0,  0,      WW-1,   0,          WH-1,   STR_NONE,                       STR_NONE },                 // panel / background
@@ -137,9 +139,9 @@ rct_window* window_server_start_open()
     window->list_information_type = 0;
 
     snprintf(_port, 7, "%u", gConfigNetwork.default_port);
-    safe_strcpy(_name, gConfigNetwork.server_name, sizeof(_name));
-    safe_strcpy(_description, gConfigNetwork.server_description, sizeof(_description));
-    safe_strcpy(_greeting, gConfigNetwork.server_greeting, sizeof(_greeting));
+    safe_strcpy(_name, gConfigNetwork.server_name.c_str(), sizeof(_name));
+    safe_strcpy(_description, gConfigNetwork.server_description.c_str(), sizeof(_description));
+    safe_strcpy(_greeting, gConfigNetwork.server_greeting.c_str(), sizeof(_greeting));
 
     return window;
 }
@@ -153,7 +155,7 @@ static void window_server_start_scenarioselect_callback(const utf8* path)
     network_set_password(_password);
     if (context_load_park_from_file(path))
     {
-        network_begin_server(gConfigNetwork.default_port, gConfigNetwork.listen_address);
+        network_begin_server(gConfigNetwork.default_port, gConfigNetwork.listen_address.c_str());
     }
 }
 
@@ -161,7 +163,7 @@ static void window_server_start_loadsave_callback(int32_t result, const utf8* pa
 {
     if (result == MODAL_RESULT_OK && context_load_park_from_file(path))
     {
-        network_begin_server(gConfigNetwork.default_port, gConfigNetwork.listen_address);
+        network_begin_server(gConfigNetwork.default_port, gConfigNetwork.listen_address.c_str());
     }
 }
 
@@ -193,7 +195,7 @@ static void window_server_start_mouseup(rct_window* w, rct_widgetindex widgetInd
                 gConfigNetwork.maxplayers++;
             }
             config_save_default();
-            window_invalidate(w);
+            w->Invalidate();
             break;
         case WIDX_MAXPLAYERS_DECREASE:
             if (gConfigNetwork.maxplayers > 1)
@@ -201,12 +203,12 @@ static void window_server_start_mouseup(rct_window* w, rct_widgetindex widgetInd
                 gConfigNetwork.maxplayers--;
             }
             config_save_default();
-            window_invalidate(w);
+            w->Invalidate();
             break;
         case WIDX_ADVERTISE_CHECKBOX:
             gConfigNetwork.advertise = !gConfigNetwork.advertise;
             config_save_default();
-            window_invalidate(w);
+            w->Invalidate();
             break;
         case WIDX_START_SERVER:
             window_scenarioselect_open(window_server_start_scenarioselect_callback, false);
@@ -267,8 +269,7 @@ static void window_server_start_textinput(rct_window* w, rct_widgetindex widgetI
 
             if (strlen(_name) > 0)
             {
-                SafeFree(gConfigNetwork.server_name);
-                gConfigNetwork.server_name = _strdup(_name);
+                gConfigNetwork.server_name = _name;
                 config_save_default();
             }
 
@@ -286,8 +287,7 @@ static void window_server_start_textinput(rct_window* w, rct_widgetindex widgetI
 
             if (strlen(_description) > 0)
             {
-                SafeFree(gConfigNetwork.server_description);
-                gConfigNetwork.server_description = _strdup(_description);
+                gConfigNetwork.server_description = _description;
                 config_save_default();
             }
 
@@ -305,8 +305,7 @@ static void window_server_start_textinput(rct_window* w, rct_widgetindex widgetI
 
             if (strlen(_greeting) > 0)
             {
-                SafeFree(gConfigNetwork.server_greeting);
-                gConfigNetwork.server_greeting = _strdup(_greeting);
+                gConfigNetwork.server_greeting = _greeting;
                 config_save_default();
             }
 
@@ -348,3 +347,5 @@ static void window_server_start_paint(rct_window* w, rct_drawpixelinfo* dpi)
     gfx_draw_string_left(dpi, STR_PASSWORD, nullptr, w->colours[1], w->x + 6, w->y + w->widgets[WIDX_PASSWORD_INPUT].top);
     gfx_draw_string_left(dpi, STR_MAX_PLAYERS, nullptr, w->colours[1], w->x + 6, w->y + w->widgets[WIDX_MAXPLAYERS].top);
 }
+
+#endif

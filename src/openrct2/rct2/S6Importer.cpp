@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -8,6 +8,7 @@
  *****************************************************************************/
 
 #include "../Context.h"
+#include "../Diagnostic.h"
 #include "../Game.h"
 #include "../GameState.h"
 #include "../OpenRCT2.h"
@@ -38,6 +39,7 @@
 #include "../ride/RideRatings.h"
 #include "../ride/ShopItem.h"
 #include "../ride/Station.h"
+#include "../ride/Track.h"
 #include "../scenario/Scenario.h"
 #include "../scenario/ScenarioRepository.h"
 #include "../util/SawyerCoding.h"
@@ -46,6 +48,7 @@
 #include "../world/Entrance.h"
 #include "../world/MapAnimation.h"
 #include "../world/Park.h"
+#include "../world/Scenery.h"
 #include "../world/Sprite.h"
 #include "../world/Surface.h"
 
@@ -114,7 +117,7 @@ public:
         auto chunkReader = SawyerChunkReader(stream);
         chunkReader.ReadChunk(&_s6.header, sizeof(_s6.header));
 
-        log_verbose("saved game classic_flag = 0x%02x\n", _s6.header.classic_flag);
+        log_verbose("saved game classic_flag = 0x%02x", _s6.header.classic_flag);
         if (isScenario)
         {
             if (_s6.header.type != S6_TYPE_SCENARIO)
@@ -212,24 +215,8 @@ public:
         scenario_rand_seed(_s6.scenario_srand_0, _s6.scenario_srand_1);
 
         ImportTileElements();
+        ImportSprites();
 
-        gNextFreeTileElementPointerIndex = _s6.next_free_tile_element_pointer_index;
-        for (int32_t i = 0; i < RCT2_MAX_SPRITES; i++)
-        {
-            std::memcpy(get_sprite(i), &_s6.sprites[i], sizeof(rct_sprite));
-        }
-
-        for (int32_t i = 0; i < NUM_SPRITE_LISTS; i++)
-        {
-            gSpriteListHead[i] = _s6.sprite_lists_head[i];
-            gSpriteListCount[i] = _s6.sprite_lists_count[i];
-        }
-        // This list contains the number of free slots. Increase it according to our own sprite limit.
-        gSpriteListCount[SPRITE_LIST_NULL] += (MAX_SPRITES - RCT2_MAX_SPRITES);
-
-        gParkName = _s6.park_name;
-        // pad_013573D6
-        gParkNameArgs = _s6.park_name_args;
         gInitialCash = _s6.initial_cash;
         gBankLoan = _s6.current_loan;
         gParkFlags = _s6.park_flags;
@@ -335,7 +322,6 @@ public:
         _gameVersion = _s6.game_version_number;
         gScenarioCompanyValueRecord = _s6.completed_company_value_record;
         // _s6.loan_hash;
-        gRideCount = _s6.ride_count;
         // pad_013587CA
         gHistoricalProfit = _s6.historical_profit;
         // pad_013587D4
@@ -347,7 +333,8 @@ public:
         gMapSizeMinus2 = _s6.map_size_minus_2;
         gMapSize = _s6.map_size;
         gMapSizeMaxXY = _s6.map_max_xy;
-        gSamePriceThroughoutParkA = _s6.same_price_throughout;
+        gSamePriceThroughoutPark = _s6.same_price_throughout
+            | (static_cast<uint64_t>(_s6.same_price_throughout_extended) << 32);
         _suggestedGuestMaximum = _s6.suggested_max_guests;
         gScenarioParkRatingWarningDays = _s6.park_rating_warning_days;
         gLastEntranceStyle = _s6.last_entrance_style;
@@ -359,7 +346,6 @@ public:
         gScenarioDetails = std::string_view(_s6.scenario_description, sizeof(_s6.scenario_description));
         gBankLoanInterestRate = _s6.current_interest_rate;
         // pad_0135934B
-        gSamePriceThroughoutParkB = _s6.same_price_throughout_extended;
         // Preserve compatibility with vanilla RCT2's save format.
         gParkEntrances.clear();
         for (uint8_t i = 0; i < RCT12_MAX_PARK_ENTRANCES; i++)
@@ -385,10 +371,6 @@ public:
             String::Set(gScenarioFileName, sizeof(gScenarioFileName), _s6.scenario_filename);
         }
         std::memcpy(gScenarioExpansionPacks, _s6.saved_expansion_pack_names, sizeof(_s6.saved_expansion_pack_names));
-        std::memcpy(gBanners, _s6.banners, sizeof(_s6.banners));
-        // Clear all of the strings, since we will probably have a higher limit on user strings in the future than RCT2.
-        user_string_clear_all();
-        std::memcpy(gUserStrings, _s6.custom_strings, sizeof(_s6.custom_strings));
         gCurrentTicks = _s6.game_ticks_1;
         gCurrentRealTimeTicks = 0;
 
@@ -400,22 +382,15 @@ public:
         gSavedViewZoom = _s6.saved_view_zoom;
         gSavedViewRotation = _s6.saved_view_rotation;
 
-        for (size_t i = 0; i < RCT2_MAX_ANIMATED_OBJECTS; i++)
-        {
-            gAnimatedObjects[i] = _s6.map_animations[i];
-        }
-        gNumMapAnimations = _s6.num_map_animations;
-        // pad_0138B582
-
-        gRideRatingsCalcData = _s6.ride_ratings_calc_data;
-        std::memcpy(gRideMeasurements, _s6.ride_measurements, sizeof(_s6.ride_measurements));
+        ImportRideRatingsCalcData();
+        ImportRideMeasurements();
         gNextGuestNumber = _s6.next_guest_index;
         gGrassSceneryTileLoopPosition = _s6.grass_and_scenery_tilepos;
         std::memcpy(gStaffPatrolAreas, _s6.patrol_areas, sizeof(_s6.patrol_areas));
         std::memcpy(gStaffModes, _s6.staff_modes, sizeof(_s6.staff_modes));
         // unk_13CA73E
         // pad_13CA73F
-        gUnk13CA740 = _s6.byte_13CA740;
+        // unk_13CA740
         gClimate = _s6.climate;
         // pad_13CA741;
         // byte_13CA742
@@ -471,6 +446,9 @@ public:
         map_count_remaining_land_rights();
         determine_ride_entrance_and_exit_locations();
 
+        auto& park = OpenRCT2::GetContext()->GetGameState()->GetPark();
+        park.Name = GetUserString(_s6.park_name);
+
         // We try to fix the cycles on import, hence the 'true' parameter
         check_for_sprite_list_cycles(true);
         check_for_spatial_index_cycles(true);
@@ -504,7 +482,7 @@ public:
             auto src = &_s6.rides[index];
             if (src->type != RIDE_TYPE_NULL)
             {
-                auto dst = get_ride(index);
+                auto dst = GetOrAllocateRide(index);
                 ImportRide(dst, src, index);
             }
         }
@@ -528,8 +506,16 @@ public:
 
         // pad_046;
         dst->status = src->status;
-        dst->name = src->name;
-        dst->name_arguments = src->name_arguments;
+
+        dst->default_name_number = src->name_arguments_number;
+        if (is_user_string_id(src->name))
+        {
+            dst->custom_name = GetUserString(src->name);
+        }
+        else
+        {
+            dst->default_name_number = src->name_arguments_number;
+        }
 
         dst->overall_view = src->overall_view;
 
@@ -550,7 +536,7 @@ public:
             if (src->exits[i].xy == RCT_XY8_UNDEFINED)
                 ride_clear_exit_location(dst, i);
             else
-                ride_set_exit_location(dst, i, { src->entrances[i].x, src->entrances[i].y, src->station_heights[i], 0 });
+                ride_set_exit_location(dst, i, { src->exits[i].x, src->exits[i].y, src->station_heights[i], 0 });
 
             dst->stations[i].LastPeepInQueue = src->last_peep_in_queue[i];
 
@@ -598,8 +584,6 @@ public:
         dst->boat_hire_return_direction = src->boat_hire_return_direction;
         dst->boat_hire_return_position = src->boat_hire_return_position;
 
-        dst->measurement_index = src->measurement_index;
-
         dst->special_track_elements = src->special_track_elements;
         // pad_0D6[2];
 
@@ -620,8 +604,11 @@ public:
         dst->turn_count_default = src->turn_count_default;
         dst->turn_count_banked = src->turn_count_banked;
         dst->turn_count_sloped = src->turn_count_sloped;
-        // Includes holes and (for some strange reason?!) sheltered_eights
-        dst->inversions = src->inversions;
+        if (dst->type == RIDE_TYPE_MINI_GOLF)
+            dst->holes = src->inversions & 0x1F;
+        else
+            dst->inversions = src->inversions & 0x1F;
+        dst->sheltered_eighths = src->inversions >> 5;
         dst->drops = src->drops;
         dst->start_drop_height = src->start_drop_height;
         dst->highest_drop_height = src->highest_drop_height;
@@ -719,6 +706,20 @@ public:
             dst->track_colour[i].additional = src->track_colour_additional[i];
             dst->track_colour[i].supports = src->track_colour_supports[i];
         }
+        // This stall was not colourable in RCT2.
+        if (dst->type == RIDE_TYPE_FOOD_STALL)
+        {
+            auto entry = object_entry_get_entry(OBJECT_TYPE_RIDE, dst->subtype);
+            if (entry != nullptr)
+            {
+                char name[DAT_NAME_LENGTH + 1];
+                object_entry_get_name_fixed(name, sizeof(name), entry);
+                if (strncmp(name, "ICECR1  ", DAT_NAME_LENGTH) == 0)
+                {
+                    dst->track_colour[0].main = COLOUR_LIGHT_BLUE;
+                }
+            }
+        }
 
         dst->music = src->music;
         dst->entrance_style = src->entrance_style;
@@ -743,6 +744,64 @@ public:
         dst->cable_lift = src->cable_lift;
 
         // pad_208[0x58];
+    }
+
+    void ImportRideRatingsCalcData()
+    {
+        const auto& src = _s6.ride_ratings_calc_data;
+        auto& dst = gRideRatingsCalcData;
+        dst = {};
+        dst.proximity_x = src.proximity_x;
+        dst.proximity_y = src.proximity_y;
+        dst.proximity_z = src.proximity_z;
+        dst.proximity_start_x = src.proximity_start_x;
+        dst.proximity_start_y = src.proximity_start_y;
+        dst.proximity_start_z = src.proximity_start_z;
+        dst.current_ride = src.current_ride;
+        dst.state = src.state;
+        dst.proximity_track_type = src.proximity_track_type;
+        dst.proximity_base_height = src.proximity_base_height;
+        dst.proximity_total = src.proximity_total;
+        for (size_t i = 0; i < std::size(src.proximity_scores); i++)
+        {
+            dst.proximity_scores[i] = src.proximity_scores[i];
+        }
+        dst.num_brakes = src.num_brakes;
+        dst.num_reversers = src.num_reversers;
+        dst.station_flags = src.station_flags;
+    }
+
+    void ImportRideMeasurements()
+    {
+        for (const auto& src : _s6.ride_measurements)
+        {
+            if (src.ride_index != RCT12_RIDE_ID_NULL)
+            {
+                auto ride = get_ride(src.ride_index);
+                if (ride != nullptr)
+                {
+                    ride->measurement = std::make_unique<RideMeasurement>();
+                    ImportRideMeasurement(*ride->measurement, src);
+                }
+            }
+        }
+    }
+
+    void ImportRideMeasurement(RideMeasurement& dst, const RCT12RideMeasurement& src)
+    {
+        dst.flags = src.flags;
+        dst.last_use_tick = src.last_use_tick;
+        dst.num_items = src.num_items;
+        dst.current_item = src.current_item;
+        dst.vehicle_index = src.vehicle_index;
+        dst.current_station = src.current_station;
+        for (size_t i = 0; i < std::size(src.velocity); i++)
+        {
+            dst.velocity[i] = src.velocity[i];
+            dst.altitude[i] = src.altitude[i];
+            dst.vertical[i] = src.vertical[i];
+            dst.lateral[i] = src.lateral[i];
+        }
     }
 
     void ImportResearchedRideTypes()
@@ -792,7 +851,50 @@ public:
 
     void ImportResearchList()
     {
-        std::memcpy(gResearchItems, _s6.research_items, sizeof(_s6.research_items));
+        bool invented = true;
+        for (size_t i = 0; i < sizeof(_s6.research_items); i++)
+        {
+            if (_s6.research_items[i].IsInventedEndMarker())
+            {
+                invented = false;
+                continue;
+            }
+            else if (_s6.research_items[i].IsUninventedEndMarker() || _s6.research_items[i].IsRandomEndMarker())
+            {
+                break;
+            }
+
+            RCT12ResearchItem* ri = &_s6.research_items[i];
+            if (invented)
+                gResearchItemsInvented.push_back(ResearchItem{ ri->rawValue, ri->category });
+            else
+                gResearchItemsUninvented.push_back(ResearchItem{ ri->rawValue, ri->category });
+        }
+    }
+
+    void ImportBanner(Banner* dst, const RCT12Banner* src)
+    {
+        *dst = {};
+        dst->type = src->type;
+        dst->flags = src->flags;
+
+        if (!(src->flags & BANNER_FLAG_LINKED_TO_RIDE) && is_user_string_id(src->string_idx))
+        {
+            dst->text = GetUserString(src->string_idx);
+        }
+
+        if (src->flags & BANNER_FLAG_LINKED_TO_RIDE)
+        {
+            dst->ride_index = src->ride_index;
+        }
+        else
+        {
+            dst->colour = src->colour;
+        }
+
+        dst->text_colour = src->text_colour;
+        dst->position.x = src->x;
+        dst->position.y = src->y;
     }
 
     void Initialise()
@@ -828,6 +930,12 @@ public:
         {
             _s6.peep_spawns[0].y = 1296;
         }
+        // #9926: Africa - Oasis has peeps spawning on the edge underground near the entrance
+        else if (String::Equals(_s6.scenario_filename, "Africa - Oasis.SC6"))
+        {
+            _s6.peep_spawns[0].y = 2128;
+            _s6.peep_spawns[0].z = 7;
+        }
 
         gPeepSpawns.clear();
         for (size_t i = 0; i < RCT12_MAX_PEEP_SPAWNS; i++)
@@ -845,9 +953,9 @@ public:
     {
         // The number of riders might have overflown or underflown. Re-calculate the value.
         uint16_t numRiders = 0;
-        for (const rct_sprite& sprite : _s6.sprites)
+        for (const auto& sprite : _s6.sprites)
         {
-            if (sprite.generic.sprite_identifier == SPRITE_IDENTIFIER_PEEP)
+            if (sprite.unknown.sprite_identifier == SPRITE_IDENTIFIER_PEEP)
             {
                 if (sprite.peep.current_ride == rideIndex
                     && (sprite.peep.state == PEEP_STATE_ON_RIDE || sprite.peep.state == PEEP_STATE_ENTERING_RIDE))
@@ -881,7 +989,9 @@ public:
                     ImportTileElement(dst, src);
             }
         }
+        gNextFreeTileElementPointerIndex = _s6.next_free_tile_element_pointer_index;
     }
+
     void ImportTileElement(TileElement* dst, const RCT12TileElement* src)
     {
         // Todo: allow for changing defition of OpenRCT2 tile element types - replace with a map
@@ -941,16 +1051,32 @@ public:
                 dst2->SetSequenceIndex(src2->GetSequenceIndex());
                 dst2->SetRideIndex(src2->GetRideIndex());
                 dst2->SetColourScheme(src2->GetColourScheme());
-                dst2->SetStationIndex(src2->GetStationIndex());
                 dst2->SetHasChain(src2->HasChain());
                 dst2->SetHasCableLift(src2->HasCableLift());
                 dst2->SetInverted(src2->IsInverted());
-                dst2->SetBrakeBoosterSpeed(src2->GetBrakeBoosterSpeed());
+                dst2->SetStationIndex(src2->GetStationIndex());
                 dst2->SetHasGreenLight(src2->HasGreenLight());
-                dst2->SetSeatRotation(src2->GetSeatRotation());
-                dst2->SetMazeEntry(src2->GetMazeEntry());
-                dst2->SetPhotoTimeout(src2->GetPhotoTimeout());
+
+                auto trackType = dst2->GetTrackType();
+                if (track_element_has_speed_setting(trackType))
+                {
+                    dst2->SetBrakeBoosterSpeed(src2->GetBrakeBoosterSpeed());
+                }
+                else if (trackType == TRACK_ELEM_ON_RIDE_PHOTO)
+                {
+                    dst2->SetPhotoTimeout(src2->GetPhotoTimeout());
+                }
+
                 // Skipping IsHighlighted()
+                auto rideType = _s6.rides[src2->GetRideIndex()].type;
+                if (rideType == RIDE_TYPE_MULTI_DIMENSION_ROLLER_COASTER)
+                {
+                    dst2->SetSeatRotation(src2->GetSeatRotation());
+                }
+                else if (rideType == RIDE_TYPE_MAZE)
+                {
+                    dst2->SetMazeEntry(src2->GetMazeEntry());
+                }
 
                 break;
             }
@@ -997,6 +1123,22 @@ public:
                 dst2->SetAcrossTrack(src2->IsAcrossTrack());
                 dst2->SetAnimationIsBackwards(src2->AnimationIsBackwards());
 
+                // Import banner information
+                auto entry = dst2->GetEntry();
+                if (entry != nullptr && entry->wall.scrolling_mode != SCROLLING_MODE_NONE)
+                {
+                    auto bannerIndex = dst2->GetBannerIndex();
+                    if (bannerIndex < std::size(_s6.banners))
+                    {
+                        auto srcBanner = &_s6.banners[bannerIndex];
+                        auto dstBanner = GetBanner(bannerIndex);
+                        ImportBanner(dstBanner, srcBanner);
+                    }
+                    else
+                    {
+                        dst2->SetBannerIndex(BANNER_INDEX_NULL);
+                    }
+                }
                 break;
             }
             case TILE_ELEMENT_TYPE_LARGE_SCENERY:
@@ -1010,6 +1152,22 @@ public:
                 dst2->SetSecondaryColour(src2->GetSecondaryColour());
                 dst2->SetBannerIndex(src2->GetBannerIndex());
 
+                // Import banner information
+                auto entry = dst2->GetEntry();
+                if (entry != nullptr && entry->large_scenery.scrolling_mode != SCROLLING_MODE_NONE)
+                {
+                    auto bannerIndex = dst2->GetBannerIndex();
+                    if (bannerIndex < std::size(_s6.banners))
+                    {
+                        auto srcBanner = &_s6.banners[bannerIndex];
+                        auto dstBanner = GetBanner(bannerIndex);
+                        ImportBanner(dstBanner, srcBanner);
+                    }
+                    else
+                    {
+                        dst2->SetBannerIndex(BANNER_INDEX_NULL);
+                    }
+                }
                 break;
             }
             case TILE_ELEMENT_TYPE_BANNER:
@@ -1021,6 +1179,17 @@ public:
                 dst2->SetPosition(src2->GetPosition());
                 dst2->SetAllowedEdges(src2->GetAllowedEdges());
 
+                auto bannerIndex = src2->GetIndex();
+                if (bannerIndex < std::size(_s6.banners))
+                {
+                    auto srcBanner = &_s6.banners[bannerIndex];
+                    auto dstBanner = GetBanner(bannerIndex);
+                    ImportBanner(dstBanner, srcBanner);
+                }
+                else
+                {
+                    dst2->SetIndex(BANNER_INDEX_NULL);
+                }
                 break;
             }
             default:
@@ -1036,7 +1205,11 @@ public:
             {
                 MarketingCampaign campaign{};
                 campaign.Type = (uint8_t)i;
-                campaign.WeeksLeft = _s6.campaign_weeks_left[i] & ~CAMPAIGN_ACTIVE_FLAG;
+                campaign.WeeksLeft = _s6.campaign_weeks_left[i] & ~(CAMPAIGN_ACTIVE_FLAG | CAMPAIGN_FIRST_WEEK_FLAG);
+                if ((_s6.campaign_weeks_left[i] & CAMPAIGN_FIRST_WEEK_FLAG) != 0)
+                {
+                    campaign.Flags |= MarketingCampaignFlags::FIRST_WEEK;
+                }
                 if (campaign.Type == ADVERTISING_CAMPAIGN_RIDE_FREE || campaign.Type == ADVERTISING_CAMPAIGN_RIDE)
                 {
                     campaign.RideId = _s6.campaign_ride_index[i];
@@ -1049,11 +1222,385 @@ public:
             }
         }
     }
+
+    void ImportSprites()
+    {
+        for (int32_t i = 0; i < RCT2_MAX_SPRITES; i++)
+        {
+            auto src = &_s6.sprites[i];
+            auto dst = get_sprite(i);
+            ImportSprite(dst, src);
+        }
+
+        for (int32_t i = 0; i < SPRITE_LIST_COUNT; i++)
+        {
+            gSpriteListHead[i] = _s6.sprite_lists_head[i];
+            gSpriteListCount[i] = _s6.sprite_lists_count[i];
+        }
+        // This list contains the number of free slots. Increase it according to our own sprite limit.
+        gSpriteListCount[SPRITE_LIST_FREE] += (MAX_SPRITES - RCT2_MAX_SPRITES);
+    }
+
+    void ImportSprite(rct_sprite* dst, const RCT2Sprite* src)
+    {
+        std::memset(dst, 0, sizeof(rct_sprite));
+        switch (src->unknown.sprite_identifier)
+        {
+            case SPRITE_IDENTIFIER_NULL:
+                ImportSpriteCommonProperties((rct_sprite_common*)dst, &src->unknown);
+                break;
+            case SPRITE_IDENTIFIER_VEHICLE:
+                ImportSpriteVehicle(&dst->vehicle, &src->vehicle);
+                break;
+            case SPRITE_IDENTIFIER_PEEP:
+                ImportSpritePeep(&dst->peep, &src->peep);
+                break;
+            case SPRITE_IDENTIFIER_MISC:
+                ImportSpriteMisc(&dst->generic, &src->unknown);
+                break;
+            case SPRITE_IDENTIFIER_LITTER:
+                ImportSpriteLitter(&dst->litter, &src->litter);
+                break;
+            default:
+                ImportSpriteCommonProperties((rct_sprite_common*)dst, (const RCT12SpriteBase*)src);
+                log_warning("Sprite identifier %d can not be imported.", src->unknown.sprite_identifier);
+                break;
+        }
+    }
+
+    void ImportSpriteVehicle(rct_vehicle* dst, const RCT2SpriteVehicle* src)
+    {
+        ImportSpriteCommonProperties((rct_sprite_common*)dst, src);
+        dst->vehicle_sprite_type = src->vehicle_sprite_type;
+        dst->bank_rotation = src->bank_rotation;
+        dst->remaining_distance = src->remaining_distance;
+        dst->velocity = src->velocity;
+        dst->acceleration = src->acceleration;
+        dst->ride = src->ride;
+        dst->vehicle_type = src->vehicle_type;
+        dst->colours = src->colours;
+        dst->track_progress = src->track_progress;
+        dst->track_direction = src->track_direction;
+        dst->track_type = src->track_type;
+        dst->track_x = src->track_x;
+        dst->track_y = src->track_y;
+        dst->track_z = src->track_z;
+        dst->next_vehicle_on_train = src->next_vehicle_on_train;
+        dst->prev_vehicle_on_ride = src->prev_vehicle_on_ride;
+        dst->next_vehicle_on_ride = src->next_vehicle_on_ride;
+        dst->var_44 = src->var_44;
+        dst->mass = src->mass;
+        dst->update_flags = src->update_flags;
+        dst->swing_sprite = src->swing_sprite;
+        dst->current_station = src->current_station;
+        dst->current_time = src->current_time;
+        dst->crash_z = src->crash_z;
+
+        VEHICLE_STATUS statusSrc = VEHICLE_STATUS_MOVING_TO_END_OF_STATION;
+        if (src->status <= static_cast<uint8_t>(VEHICLE_STATUS_STOPPED_BY_BLOCK_BRAKES))
+        {
+            statusSrc = static_cast<VEHICLE_STATUS>(src->status);
+        }
+
+        dst->status = statusSrc;
+        dst->sub_state = src->sub_state;
+        for (size_t i = 0; i < std::size(src->peep); i++)
+        {
+            dst->peep[i] = src->peep[i];
+            dst->peep_tshirt_colours[i] = src->peep_tshirt_colours[i];
+        }
+        dst->num_seats = src->num_seats;
+        dst->num_peeps = src->num_peeps;
+        dst->next_free_seat = src->next_free_seat;
+        dst->restraints_position = src->restraints_position;
+        dst->crash_x = src->crash_x;
+        dst->sound2_flags = src->sound2_flags;
+        dst->spin_sprite = src->spin_sprite;
+        dst->sound1_id = static_cast<SoundId>(src->sound1_id);
+        dst->sound1_volume = src->sound1_volume;
+        dst->sound2_id = static_cast<SoundId>(src->sound2_id);
+        dst->sound2_volume = src->sound2_volume;
+        dst->sound_vector_factor = src->sound_vector_factor;
+        dst->time_waiting = src->time_waiting;
+        dst->speed = src->speed;
+        dst->powered_acceleration = src->powered_acceleration;
+        dst->dodgems_collision_direction = src->dodgems_collision_direction;
+        dst->animation_frame = src->animation_frame;
+        dst->var_C8 = src->var_C8;
+        dst->var_CA = src->var_CA;
+        dst->scream_sound_id = static_cast<SoundId>(src->scream_sound_id);
+        dst->var_CD = src->var_CD;
+        dst->var_CE = src->var_CE;
+        dst->var_CF = src->var_CF;
+        dst->lost_time_out = src->lost_time_out;
+        dst->vertical_drop_countdown = src->vertical_drop_countdown;
+        dst->var_D3 = src->var_D3;
+        dst->mini_golf_current_animation = src->mini_golf_current_animation;
+        dst->mini_golf_flags = src->mini_golf_flags;
+        dst->ride_subtype = src->ride_subtype;
+        dst->colours_extended = src->colours_extended;
+        dst->seat_rotation = src->seat_rotation;
+        dst->target_seat_rotation = src->target_seat_rotation;
+    }
+
+    void ImportSpritePeep(Peep* dst, const RCT2SpritePeep* src)
+    {
+        ImportSpriteCommonProperties((rct_sprite_common*)dst, src);
+        if (is_user_string_id(src->name_string_idx))
+        {
+            dst->SetName(GetUserString(src->name_string_idx));
+        }
+        dst->next_x = src->next_x;
+        dst->next_y = src->next_y;
+        dst->next_z = src->next_z;
+        dst->next_flags = src->next_flags;
+        dst->outside_of_park = src->outside_of_park;
+        dst->state = (PeepState)src->state;
+        dst->sub_state = src->sub_state;
+        dst->sprite_type = (PeepSpriteType)src->sprite_type;
+        dst->type = (PeepType)src->peep_type;
+        dst->no_of_rides = src->no_of_rides;
+        dst->tshirt_colour = src->tshirt_colour;
+        dst->trousers_colour = src->trousers_colour;
+        dst->destination_x = src->destination_x;
+        dst->destination_y = src->destination_y;
+        dst->destination_tolerance = src->destination_tolerance;
+        dst->var_37 = src->var_37;
+        dst->energy = src->energy;
+        dst->energy_target = src->energy_target;
+        dst->happiness = src->happiness;
+        dst->happiness_target = src->happiness_target;
+        dst->nausea = src->nausea;
+        dst->nausea_target = src->nausea_target;
+        dst->hunger = src->hunger;
+        dst->thirst = src->thirst;
+        dst->toilet = src->toilet;
+        dst->mass = src->mass;
+        dst->time_to_consume = src->time_to_consume;
+        dst->intensity = src->intensity;
+        dst->nausea_tolerance = src->nausea_tolerance;
+        dst->window_invalidate_flags = src->window_invalidate_flags;
+        dst->paid_on_drink = src->paid_on_drink;
+        for (size_t i = 0; i < std::size(src->ride_types_been_on); i++)
+        {
+            dst->ride_types_been_on[i] = src->ride_types_been_on[i];
+        }
+        dst->item_extra_flags = src->item_extra_flags;
+        dst->photo2_ride_ref = src->photo2_ride_ref;
+        dst->photo3_ride_ref = src->photo3_ride_ref;
+        dst->photo4_ride_ref = src->photo4_ride_ref;
+        dst->current_ride = src->current_ride;
+        dst->current_ride_station = src->current_ride_station;
+        dst->current_train = src->current_train;
+        dst->time_to_sitdown = src->time_to_sitdown;
+        dst->special_sprite = src->special_sprite;
+        dst->action_sprite_type = (PeepActionSpriteType)src->action_sprite_type;
+        dst->next_action_sprite_type = (PeepActionSpriteType)src->next_action_sprite_type;
+        dst->action_sprite_image_offset = src->action_sprite_image_offset;
+        dst->action = (PeepActionType)src->action;
+        dst->action_frame = src->action_frame;
+        dst->step_progress = src->step_progress;
+        dst->next_in_queue = src->next_in_queue;
+        dst->direction = src->direction;
+        dst->interaction_ride_index = src->interaction_ride_index;
+        dst->time_in_queue = src->time_in_queue;
+        for (size_t i = 0; i < std::size(src->rides_been_on); i++)
+        {
+            dst->rides_been_on[i] = src->rides_been_on[i];
+        }
+        dst->id = src->id;
+        dst->cash_in_pocket = src->cash_in_pocket;
+        dst->cash_spent = src->cash_spent;
+        dst->time_in_park = src->time_in_park;
+        dst->rejoin_queue_timeout = src->rejoin_queue_timeout;
+        dst->previous_ride = src->previous_ride;
+        dst->previous_ride_time_out = src->previous_ride_time_out;
+        for (size_t i = 0; i < std::size(src->thoughts); i++)
+        {
+            auto srcThought = &src->thoughts[i];
+            auto dstThought = &dst->thoughts[i];
+            dstThought->type = (PeepThoughtType)srcThought->type;
+            dstThought->item = srcThought->item;
+            dstThought->freshness = srcThought->freshness;
+            dstThought->fresh_timeout = srcThought->fresh_timeout;
+        }
+        dst->path_check_optimisation = src->path_check_optimisation;
+        dst->guest_heading_to_ride_id = src->guest_heading_to_ride_id;
+        dst->peep_is_lost_countdown = src->peep_is_lost_countdown;
+        dst->photo1_ride_ref = src->photo1_ride_ref;
+        dst->peep_flags = src->peep_flags;
+        dst->pathfind_goal = src->pathfind_goal;
+        for (size_t i = 0; i < std::size(src->pathfind_history); i++)
+        {
+            dst->pathfind_history[i] = src->pathfind_history[i];
+        }
+        dst->no_action_frame_num = src->no_action_frame_num;
+        dst->litter_count = src->litter_count;
+        dst->time_on_ride = src->time_on_ride;
+        dst->disgusting_count = src->disgusting_count;
+        dst->paid_to_enter = src->paid_to_enter;
+        dst->paid_on_rides = src->paid_on_rides;
+        dst->paid_on_food = src->paid_on_food;
+        dst->paid_on_souvenirs = src->paid_on_souvenirs;
+        dst->no_of_food = src->no_of_food;
+        dst->no_of_drinks = src->no_of_drinks;
+        dst->no_of_souvenirs = src->no_of_souvenirs;
+        dst->vandalism_seen = src->vandalism_seen;
+        dst->voucher_type = src->voucher_type;
+        dst->voucher_arguments = src->voucher_arguments;
+        dst->surroundings_thought_timeout = src->surroundings_thought_timeout;
+        dst->angriness = src->angriness;
+        dst->time_lost = src->time_lost;
+        dst->days_in_queue = src->days_in_queue;
+        dst->balloon_colour = src->balloon_colour;
+        dst->umbrella_colour = src->umbrella_colour;
+        dst->hat_colour = src->hat_colour;
+        dst->favourite_ride = src->favourite_ride;
+        dst->favourite_ride_rating = src->favourite_ride_rating;
+        dst->item_standard_flags = src->item_standard_flags;
+    }
+
+    void ImportSpriteMisc(rct_sprite_common* cdst, const RCT12SpriteBase* csrc)
+    {
+        ImportSpriteCommonProperties(cdst, csrc);
+        switch (cdst->type)
+        {
+            case SPRITE_MISC_STEAM_PARTICLE:
+            {
+                auto src = (const RCT12SpriteSteamParticle*)csrc;
+                auto dst = (rct_steam_particle*)cdst;
+                dst->time_to_move = src->time_to_move;
+                dst->frame = src->frame;
+                break;
+            }
+            case SPRITE_MISC_MONEY_EFFECT:
+            {
+                auto src = (const RCT12SpriteMoneyEffect*)csrc;
+                auto dst = (rct_money_effect*)cdst;
+                dst->move_delay = src->move_delay;
+                dst->num_movements = src->num_movements;
+                dst->vertical = src->vertical;
+                dst->value = src->value;
+                dst->offset_x = src->offset_x;
+                dst->wiggle = src->wiggle;
+                break;
+            }
+            case SPRITE_MISC_CRASHED_VEHICLE_PARTICLE:
+            {
+                auto src = (const RCT12SpriteCrashedVehicleParticle*)csrc;
+                auto dst = (rct_crashed_vehicle_particle*)cdst;
+                dst->frame = src->frame;
+                dst->time_to_live = src->time_to_live;
+                dst->frame = src->frame;
+                dst->colour[0] = src->colour[0];
+                dst->colour[1] = src->colour[1];
+                dst->crashed_sprite_base = src->crashed_sprite_base;
+                dst->velocity_x = src->velocity_x;
+                dst->velocity_y = src->velocity_y;
+                dst->velocity_z = src->velocity_z;
+                dst->acceleration_x = src->acceleration_x;
+                dst->acceleration_y = src->acceleration_y;
+                dst->acceleration_z = src->acceleration_z;
+                break;
+            }
+            case SPRITE_MISC_EXPLOSION_CLOUD:
+            case SPRITE_MISC_EXPLOSION_FLARE:
+            case SPRITE_MISC_CRASH_SPLASH:
+            {
+                auto src = (const RCT12SpriteParticle*)csrc;
+                auto dst = (rct_sprite_generic*)cdst;
+                dst->frame = src->frame;
+                break;
+            }
+            case SPRITE_MISC_JUMPING_FOUNTAIN_WATER:
+            case SPRITE_MISC_JUMPING_FOUNTAIN_SNOW:
+            {
+                auto* src = (const RCT12SpriteJumpingFountain*)csrc;
+                auto* dst = (JumpingFountain*)cdst;
+                dst->NumTicksAlive = src->num_ticks_alive;
+                dst->frame = src->frame;
+                dst->FountainFlags = src->fountain_flags;
+                dst->TargetX = src->target_x;
+                dst->TargetY = src->target_y;
+                dst->Iteration = src->iteration;
+                break;
+            }
+            case SPRITE_MISC_BALLOON:
+            {
+                auto src = (const RCT12SpriteBalloon*)csrc;
+                auto dst = (rct_balloon*)cdst;
+                dst->popped = src->popped;
+                dst->time_to_move = src->time_to_move;
+                dst->frame = src->frame;
+                dst->colour = src->colour;
+                break;
+            }
+            case SPRITE_MISC_DUCK:
+            {
+                auto src = (const RCT12SpriteDuck*)csrc;
+                auto dst = (rct_duck*)cdst;
+                dst->frame = src->frame;
+                dst->target_x = src->target_x;
+                dst->target_y = src->target_y;
+                dst->state = src->state;
+                break;
+            }
+            default:
+                log_warning("Misc. sprite type %d can not be imported.", cdst->type);
+                break;
+        }
+    }
+
+    void ImportSpriteLitter(rct_litter* dst, const RCT12SpriteLitter* src)
+    {
+        ImportSpriteCommonProperties(dst, src);
+        dst->creationTick = src->creationTick;
+    }
+
+    void ImportSpriteCommonProperties(rct_sprite_common* dst, const RCT12SpriteBase* src)
+    {
+        dst->sprite_identifier = src->sprite_identifier;
+        dst->type = src->type;
+        dst->next_in_quadrant = src->next_in_quadrant;
+        dst->next = src->next;
+        dst->previous = src->previous;
+        dst->linked_list_index = src->linked_list_type_offset >> 1;
+        dst->sprite_height_negative = src->sprite_height_negative;
+        dst->sprite_index = src->sprite_index;
+        dst->flags = src->flags;
+        dst->x = src->x;
+        dst->y = src->y;
+        dst->z = src->z;
+        dst->sprite_width = src->sprite_width;
+        dst->sprite_height_positive = src->sprite_height_positive;
+        dst->sprite_left = src->sprite_left;
+        dst->sprite_top = src->sprite_top;
+        dst->sprite_right = src->sprite_right;
+        dst->sprite_bottom = src->sprite_bottom;
+        dst->sprite_direction = src->sprite_direction;
+    }
+
+    std::string GetUserString(rct_string_id stringId)
+    {
+        const auto originalString = _s6.custom_strings[(stringId - USER_STRING_START) % 1024];
+        std::string_view originalStringView(originalString, USER_STRING_MAX_LENGTH);
+        auto withoutFormatCodes = RCT12::RemoveFormatCodes(originalStringView);
+        return rct2_to_utf8(withoutFormatCodes, RCT2_LANGUAGE_ID_ENGLISH_UK);
+    }
 };
 
 std::unique_ptr<IParkImporter> ParkImporter::CreateS6(IObjectRepository& objectRepository)
 {
     return std::make_unique<S6Importer>(objectRepository);
+}
+
+static void show_error(uint8_t errorType, rct_string_id errorStringId)
+{
+    if (errorType == ERROR_TYPE_GENERIC)
+    {
+        context_show_error(errorStringId, 0xFFFF);
+    }
+    context_show_error(STR_UNABLE_TO_LOAD_FILE, errorStringId);
 }
 
 void load_from_sv6(const char* path)
@@ -1067,24 +1614,23 @@ void load_from_sv6(const char* path)
         objectMgr.LoadObjects(result.RequiredObjects.data(), result.RequiredObjects.size());
         s6Importer->Import();
         game_fix_save_vars();
+        AutoCreateMapAnimations();
         sprite_position_tween_reset();
         gScreenAge = 0;
         gLastAutoSaveUpdate = AUTOSAVE_PAUSE;
     }
     catch (const ObjectLoadException&)
     {
-        gErrorType = ERROR_TYPE_FILE_LOAD;
-        gErrorStringId = STR_FILE_CONTAINS_INVALID_DATA;
+        show_error(ERROR_TYPE_FILE_LOAD, STR_FILE_CONTAINS_INVALID_DATA);
     }
-    catch (const IOException&)
+    catch (const IOException& loadError)
     {
-        gErrorType = ERROR_TYPE_FILE_LOAD;
-        gErrorStringId = STR_GAME_SAVE_FAILED;
+        log_error("Error loading: %s", loadError.what());
+        show_error(ERROR_TYPE_FILE_LOAD, STR_GAME_SAVE_FAILED);
     }
     catch (const std::exception&)
     {
-        gErrorType = ERROR_TYPE_FILE_LOAD;
-        gErrorStringId = STR_FILE_CONTAINS_INVALID_DATA;
+        show_error(ERROR_TYPE_FILE_LOAD, STR_FILE_CONTAINS_INVALID_DATA);
     }
 }
 
@@ -1104,23 +1650,23 @@ void load_from_sc6(const char* path)
         objManager.LoadObjects(result.RequiredObjects.data(), result.RequiredObjects.size());
         s6Importer->Import();
         game_fix_save_vars();
+        AutoCreateMapAnimations();
         sprite_position_tween_reset();
         return;
     }
-    catch (const ObjectLoadException&)
+    catch (const ObjectLoadException& loadError)
     {
-        gErrorType = ERROR_TYPE_FILE_LOAD;
-        gErrorStringId = STR_GAME_SAVE_FAILED;
+        log_error("Error loading: %s", loadError.what());
+        show_error(ERROR_TYPE_FILE_LOAD, STR_GAME_SAVE_FAILED);
     }
-    catch (const IOException&)
+    catch (const IOException& loadError)
     {
-        gErrorType = ERROR_TYPE_FILE_LOAD;
-        gErrorStringId = STR_GAME_SAVE_FAILED;
+        log_error("Error loading: %s", loadError.what());
+        show_error(ERROR_TYPE_FILE_LOAD, STR_GAME_SAVE_FAILED);
     }
     catch (const std::exception&)
     {
-        gErrorType = ERROR_TYPE_FILE_LOAD;
-        gErrorStringId = STR_FILE_CONTAINS_INVALID_DATA;
+        show_error(ERROR_TYPE_FILE_LOAD, STR_FILE_CONTAINS_INVALID_DATA);
     }
     gScreenAge = 0;
     gLastAutoSaveUpdate = AUTOSAVE_PAUSE;

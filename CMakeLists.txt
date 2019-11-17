@@ -7,6 +7,7 @@ endif()
 project(openrct2 CXX)
 
 include(cmake/platform.cmake)
+include(CMakeDependentOption)
 
 if (NOT MSVC)
     include(FindPkgConfig)
@@ -20,22 +21,29 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(CMAKE_MACOSX_RPATH 1)
 
-set(TITLE_SEQUENCE_URL  "https://github.com/OpenRCT2/title-sequences/releases/download/v0.1.2/title-sequence-v0.1.2.zip")
-set(TITLE_SEQUENCE_SHA1 "1136ef92bfb05cd1cba9831ba6dc4a653d87a246")
+set(TITLE_SEQUENCE_URL  "https://github.com/OpenRCT2/title-sequences/releases/download/v0.1.2c/title-sequences.zip")
+set(TITLE_SEQUENCE_SHA1 "304d13a126c15bf2c86ff13b81a2f2cc1856ac8d")
 
-set(OBJECTS_URL  "https://github.com/OpenRCT2/objects/releases/download/v1.0.8/objects.zip")
-set(OBJECTS_SHA1 "23dffc0335d9324cfb95adf09169df6e97e3bcf6")
+set(OBJECTS_URL  "https://github.com/OpenRCT2/objects/releases/download/v1.0.12/objects.zip")
+set(OBJECTS_SHA1 "56b5d22ed7da0afa750b3dcb5ac22de61e3597c2")
+
+set(REPLAYS_URL  "https://github.com/OpenRCT2/replays/releases/download/v0.0.4/replays.zip")
+set(REPLAYS_SHA1 "6584368CD04EC42FDC2EB5DF26FECE9A964C27B7")
 
 option(FORCE32 "Force 32-bit build. It will add `-m32` to compiler flags.")
 option(WITH_TESTS "Build tests")
 option(PORTABLE "Create a portable build (-rpath=$ORIGIN)" OFF)
 option(DOWNLOAD_TITLE_SEQUENCES "Download title sequences during installation." ON)
 option(DOWNLOAD_OBJECTS "Download objects during installation." ON)
+CMAKE_DEPENDENT_OPTION(DOWNLOAD_REPLAYS "Download replays during installation." ON
+    "WITH_TESTS" OFF)
 
 # Options
 option(STATIC "Create a static build.")
 option(USE_MMAP "Use mmap to try loading rct2's data segment into memory.")
 
+option(DISABLE_DISCORD_RPC "Disable Discord-RPC support." OFF)
+option(DISABLE_GOOGLE_BENCHMARK "Disable Google Benchmarks support." OFF)
 option(DISABLE_HTTP_TWITCH "Disable HTTP and Twitch support.")
 option(DISABLE_NETWORK "Disable multiplayer functionality. Mainly for testing.")
 option(DISABLE_TTF "Disable support for TTF provided by freetype2.")
@@ -120,17 +128,19 @@ if (CXX_WARN_SUGGEST_FINAL_METHODS)
    add_definitions(-D__WARN_SUGGEST_FINAL_METHODS__)
 endif ()
 
-if(EXISTS "${ROOT_DIR}/discord-rpc")
-    # Don't build discord's examples, some of which are in C and do not honour
-    # the flags we set for C++. Also we don't use the provided examples.
-    set(BUILD_EXAMPLES OFF CACHE BOOL "Build example apps")
-    add_subdirectory("${ROOT_DIR}/discord-rpc")
-    add_definitions(-D__ENABLE_DISCORD__)
-    include_directories("${ROOT_DIR}/discord-rpc/include")
-    set(HAVE_DISCORD_RPC TRUE)
-    message("Building with discord-rpc support")
-else()
-	message("No discord-rpc detected, to enable clone discord-rpc to root directory: ${ROOT_DIR}")
+if (NOT DISABLE_DISCORD_RPC)
+    if(EXISTS "${ROOT_DIR}/discord-rpc")
+        # Don't build discord's examples, some of which are in C and do not honour
+        # the flags we set for C++. Also we don't use the provided examples.
+        set(BUILD_EXAMPLES OFF CACHE BOOL "Build example apps")
+        add_subdirectory("${ROOT_DIR}/discord-rpc")
+        add_definitions(-D__ENABLE_DISCORD__)
+        include_directories("${ROOT_DIR}/discord-rpc/include")
+        set(HAVE_DISCORD_RPC TRUE)
+        message("Building with discord-rpc support")
+    else()
+        message("No discord-rpc detected, to enable clone discord-rpc to root directory: ${ROOT_DIR}")
+    endif()
 endif()
 
 # Copied from https://github.com/opencv/opencv/blob/dcdd6af5a856826fe62c95322145731e702e54c5/cmake/OpenCVDetectCXXCompiler.cmake#L63-L70
@@ -176,8 +186,10 @@ if (MSVC)
 
     add_definitions(-D_CRT_SECURE_NO_WARNINGS)
     add_definitions(-D_SCL_SECURE_NO_WARNINGS)
-    add_definitions(-D__SSE4_1__)
-    add_definitions(-D__AVX2__)
+    if ((CMAKE_VS_PLATFORM_NAME STREQUAL "Win32") OR (CMAKE_VS_PLATFORM_NAME STREQUAL "x64"))
+        add_definitions(-D__SSE4_1__)
+        add_definitions(-D__AVX2__)
+    endif ()
     add_definitions(-DNOMINMAX)
 else ()
     ADD_CHECK_CXX_COMPILER_FLAG(CMAKE_CXX_FLAGS CXX_WARN_NULL_DEREFERENCE -Wnull-dereference)
@@ -343,6 +355,16 @@ if (DOWNLOAD_OBJECTS)
             file(REMOVE \$ENV{DESTDIR}/${CMAKE_INSTALL_FULL_DATADIR}/${PROJECT}/object/objects.zip)\n\
         endif ()")
 endif ()
+if (DOWNLOAD_REPLAYS)
+    install(CODE
+        "if (EXISTS \${CMAKE_CURRENT_BINARY_DIR}/testdata/replays/)\n\
+            message(\"Using cached replays\")\n\
+        else () \n\
+	    file(DOWNLOAD ${REPLAYS_URL} \${CMAKE_CURRENT_BINARY_DIR}/testdata/replays/replays.zip EXPECTED_HASH SHA1=${REPLAYS_SHA1} SHOW_PROGRESS)\n\
+            execute_process(COMMAND \"${CMAKE_COMMAND}\" -E chdir \${CMAKE_CURRENT_BINARY_DIR}/testdata/replays/ \"${CMAKE_COMMAND}\" -E tar xf replays.zip)\n\
+            file(REMOVE \${CMAKE_CURRENT_BINARY_DIR}/testdata/replays/replays.zip)\n\
+        endif ()")
+endif ()
 install(TARGETS "libopenrct2" LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
                               ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 if(NOT DISABLE_GUI)
@@ -353,18 +375,20 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/g2.dat" DESTINATION "${CMAKE_INSTALL_
 install(DIRECTORY "data/" DESTINATION "${CMAKE_INSTALL_DATADIR}/openrct2")
 install(FILES ${DOC_FILES} DESTINATION "${CMAKE_INSTALL_DOCDIR}")
 install(FILES "distribution/linux/openrct2.appdata.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/metainfo")
-install(FILES "resources/logo/icon_x16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "openrct2.png")
-install(FILES "resources/logo/icon_x24.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/24x24/apps" RENAME "openrct2.png")
-install(FILES "resources/logo/icon_x32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "openrct2.png")
-install(FILES "resources/logo/icon_x48.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps" RENAME "openrct2.png")
-install(FILES "resources/logo/icon_x64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "openrct2.png")
-install(FILES "resources/logo/icon_x96.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/96x96/apps" RENAME "openrct2.png")
-install(FILES "resources/logo/icon_x128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "openrct2.png")
-install(FILES "resources/logo/icon_x256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "openrct2.png")
-install(FILES "resources/logo/icon_flag.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps" RENAME "openrct2.svg")
-install(FILES "distribution/linux/openrct2.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
-install(FILES "distribution/linux/openrct2-savegame.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
-install(FILES "distribution/linux/openrct2-scenario.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
-install(FILES "distribution/linux/openrct2-uri.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+if (NOT DISABLE_GUI)
+	install(FILES "resources/logo/icon_x16.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/16x16/apps" RENAME "openrct2.png")
+	install(FILES "resources/logo/icon_x24.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/24x24/apps" RENAME "openrct2.png")
+	install(FILES "resources/logo/icon_x32.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/32x32/apps" RENAME "openrct2.png")
+	install(FILES "resources/logo/icon_x48.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/48x48/apps" RENAME "openrct2.png")
+	install(FILES "resources/logo/icon_x64.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/64x64/apps" RENAME "openrct2.png")
+	install(FILES "resources/logo/icon_x96.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/96x96/apps" RENAME "openrct2.png")
+	install(FILES "resources/logo/icon_x128.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/128x128/apps" RENAME "openrct2.png")
+	install(FILES "resources/logo/icon_x256.png" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/256x256/apps" RENAME "openrct2.png")
+	install(FILES "resources/logo/icon_flag.svg" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/icons/hicolor/scalable/apps" RENAME "openrct2.svg")
+	install(FILES "distribution/linux/openrct2.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+	install(FILES "distribution/linux/openrct2-savegame.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+	install(FILES "distribution/linux/openrct2-scenario.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+	install(FILES "distribution/linux/openrct2-uri.desktop" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/applications")
+endif()
 install(FILES "distribution/linux/openrct2-mimeinfo.xml" DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/mime/packages/" RENAME "openrct2.xml")
 install(DIRECTORY "distribution/man/" DESTINATION "${CMAKE_INSTALL_MANDIR}/man6" FILES_MATCHING PATTERN "*.6")

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -17,6 +17,7 @@
 #include <openrct2/Editor.h>
 #include <openrct2/FileClassifier.h>
 #include <openrct2/Game.h>
+#include <openrct2/GameState.h>
 #include <openrct2/config/Config.h>
 #include <openrct2/core/FileScanner.h>
 #include <openrct2/core/Guard.hpp>
@@ -25,6 +26,7 @@
 #include <openrct2/localisation/Localisation.h>
 #include <openrct2/platform/Platform2.h>
 #include <openrct2/platform/platform.h>
+#include <openrct2/rct2/T6Exporter.h>
 #include <openrct2/ride/TrackDesign.h>
 #include <openrct2/scenario/Scenario.h>
 #include <openrct2/title/TitleScreen.h>
@@ -36,8 +38,8 @@
 
 #pragma region Widgets
 
-#define WW 340
-#define WH 400
+constexpr int32_t WW = 340;
+constexpr int32_t WH = 400;
 
 // clang-format off
 enum
@@ -82,8 +84,8 @@ static void window_loadsave_close(rct_window *w);
 static void window_loadsave_mouseup(rct_window *w, rct_widgetindex widgetIndex);
 static void window_loadsave_resize(rct_window *w);
 static void window_loadsave_scrollgetsize(rct_window *w, int32_t scrollIndex, int32_t *width, int32_t *height);
-static void window_loadsave_scrollmousedown(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
-static void window_loadsave_scrollmouseover(rct_window *w, int32_t scrollIndex, int32_t x, int32_t y);
+static void window_loadsave_scrollmousedown(rct_window *w, int32_t scrollIndex, ScreenCoordsXY screenCoords);
+static void window_loadsave_scrollmouseover(rct_window *w, int32_t scrollIndex, ScreenCoordsXY screenCoords);
 static void window_loadsave_textinput(rct_window *w, rct_widgetindex widgetIndex, char *text);
 static void window_loadsave_compute_max_date_width();
 static void window_loadsave_invalidate(rct_window *w);
@@ -143,6 +145,7 @@ struct LoadSaveListItem
 };
 
 static loadsave_callback _loadSaveCallback;
+static TrackDesign* _trackDesign;
 
 static std::vector<LoadSaveListItem> _listItems;
 static char _directory[MAX_PATH];
@@ -240,25 +243,19 @@ static const char* getFilterPatternByType(const int32_t type, const bool isSave)
 static int32_t window_loadsave_get_dir(const int32_t type, char* path, size_t pathSize)
 {
     const char* last_save = getLastDirectoryByType(type);
-    if (last_save && platform_ensure_directory_exists(last_save))
+    if (last_save != nullptr && platform_directory_exists(last_save))
         safe_strcpy(path, last_save, pathSize);
     else
         getInitialDirectoryByType(type, path, pathSize);
-
-    if (!platform_ensure_directory_exists(path))
-    {
-        log_error("Unable to create save directory.");
-        return 0;
-    }
-
     return 1;
 }
 
 static bool browse(bool isSave, char* path, size_t pathSize);
 
-rct_window* window_loadsave_open(int32_t type, const char* defaultName, loadsave_callback callback)
+rct_window* window_loadsave_open(int32_t type, const char* defaultName, loadsave_callback callback, TrackDesign* trackDesign)
 {
     _loadSaveCallback = callback;
+    _trackDesign = trackDesign;
     _type = type;
     _defaultName[0] = '\0';
 
@@ -346,12 +343,12 @@ static void window_loadsave_resize(rct_window* w)
 {
     if (w->width < w->min_width)
     {
-        window_invalidate(w);
+        w->Invalidate();
         w->width = w->min_width;
     }
     if (w->height < w->min_height)
     {
-        window_invalidate(w);
+        w->Invalidate();
         w->height = w->min_height;
     }
 }
@@ -413,15 +410,14 @@ static bool browse(bool isSave, char* path, size_t pathSize)
         }
         else
         {
-            utf8 buffer[USER_STRING_MAX_LENGTH]{};
-            if (gParkName != STR_NONE)
-                format_string(buffer, pathSize, gParkName, nullptr);
-
-            // Use localized "Unnamed Park" if park name was empty
-            if (String::SizeOf(buffer) == 0)
-                format_string(buffer, pathSize, STR_UNNAMED_PARK, nullptr);
-
-            safe_strcat_path(path, buffer, pathSize);
+            auto& park = OpenRCT2::GetContext()->GetGameState()->GetPark();
+            auto buffer = park.Name;
+            if (buffer.empty())
+            {
+                // Use localised "Unnamed Park" if park name was empty.
+                buffer = format_string(STR_UNNAMED_PARK, nullptr);
+            }
+            safe_strcat_path(path, buffer.c_str(), pathSize);
         }
     }
 
@@ -438,7 +434,7 @@ static bool browse(bool isSave, char* path, size_t pathSize)
     {
         // When the given save type was given, Windows still interprets a filename with a dot in its name as a custom extension,
         // meaning files like "My Coaster v1.2" will not get the .td6 extension by default.
-        if (get_file_extension_type(path) != fileType)
+        if (isSave && get_file_extension_type(path) != fileType)
             path_append_extension(path, extension, pathSize);
 
         return true;
@@ -500,7 +496,7 @@ static void window_loadsave_mouseup(rct_window* w, rct_widgetindex widgetIndex)
             }
             config_save_default();
             window_loadsave_sort_list();
-            window_invalidate(w);
+            w->Invalidate();
             break;
 
         case WIDX_SORT_DATE:
@@ -514,7 +510,7 @@ static void window_loadsave_mouseup(rct_window* w, rct_widgetindex widgetIndex)
             }
             config_save_default();
             window_loadsave_sort_list();
-            window_invalidate(w);
+            w->Invalidate();
             break;
 
         case WIDX_DEFAULT:
@@ -531,11 +527,11 @@ static void window_loadsave_scrollgetsize(rct_window* w, int32_t scrollIndex, in
     *height = w->no_list_items * SCROLLABLE_ROW_HEIGHT;
 }
 
-static void window_loadsave_scrollmousedown(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_loadsave_scrollmousedown(rct_window* w, int32_t scrollIndex, ScreenCoordsXY screenCoords)
 {
     int32_t selectedItem;
 
-    selectedItem = y / SCROLLABLE_ROW_HEIGHT;
+    selectedItem = screenCoords.y / SCROLLABLE_ROW_HEIGHT;
     if (selectedItem >= w->no_list_items)
         return;
 
@@ -567,17 +563,17 @@ static void window_loadsave_scrollmousedown(rct_window* w, int32_t scrollIndex, 
     }
 }
 
-static void window_loadsave_scrollmouseover(rct_window* w, int32_t scrollIndex, int32_t x, int32_t y)
+static void window_loadsave_scrollmouseover(rct_window* w, int32_t scrollIndex, ScreenCoordsXY screenCoords)
 {
     int32_t selectedItem;
 
-    selectedItem = y / SCROLLABLE_ROW_HEIGHT;
+    selectedItem = screenCoords.y / SCROLLABLE_ROW_HEIGHT;
     if (selectedItem >= w->no_list_items)
         return;
 
     w->selected_list_item = selectedItem;
 
-    window_invalidate(w);
+    w->Invalidate();
 }
 
 static void window_loadsave_textinput(rct_window* w, rct_widgetindex widgetIndex, char* text)
@@ -613,7 +609,7 @@ static void window_loadsave_textinput(rct_window* w, rct_widgetindex widgetIndex
             window_init_scroll_widgets(w);
 
             w->no_list_items = static_cast<uint16_t>(_listItems.size());
-            window_invalidate(w);
+            w->Invalidate();
             break;
 
         case WIDX_NEW_FILE:
@@ -793,15 +789,15 @@ static bool list_item_sort(LoadSaveListItem& a, LoadSaveListItem& b)
     switch (gConfigGeneral.load_save_sort)
     {
         case SORT_NAME_ASCENDING:
-            return strcicmp(a.name.c_str(), b.name.c_str()) < 0;
+            return strlogicalcmp(a.name.c_str(), b.name.c_str()) < 0;
         case SORT_NAME_DESCENDING:
-            return -strcicmp(a.name.c_str(), b.name.c_str()) < 0;
+            return -strlogicalcmp(a.name.c_str(), b.name.c_str()) < 0;
         case SORT_DATE_DESCENDING:
             return -difftime(a.date_modified, b.date_modified) < 0;
         case SORT_DATE_ASCENDING:
             return difftime(a.date_modified, b.date_modified) < 0;
         default:
-            return strcicmp(a.name.c_str(), b.name.c_str()) < 0;
+            return strlogicalcmp(a.name.c_str(), b.name.c_str()) < 0;
     }
 }
 
@@ -971,7 +967,7 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
         window_loadsave_sort_list();
     }
 
-    window_invalidate(w);
+    w->Invalidate();
 }
 
 static void window_loadsave_invoke_callback(int32_t result, const utf8* path)
@@ -1113,8 +1109,13 @@ static void window_loadsave_select(rct_window* w, const char* path)
 
         case (LOADSAVETYPE_SAVE | LOADSAVETYPE_TRACK):
         {
+            save_path(&gConfigGeneral.last_save_track_directory, pathBuffer);
+
             path_set_extension(pathBuffer, "td6", sizeof(pathBuffer));
-            int32_t success = track_design_save_to_file(pathBuffer);
+
+            T6Exporter t6Export{ _trackDesign };
+
+            auto success = t6Export.SaveTrack(pathBuffer);
 
             if (success)
             {
@@ -1139,8 +1140,8 @@ static void window_loadsave_select(rct_window* w, const char* path)
 
 #    pragma region Overwrite prompt
 
-#    define OVERWRITE_WW 200
-#    define OVERWRITE_WH 100
+constexpr int32_t OVERWRITE_WW = 200;
+constexpr int32_t OVERWRITE_WH = 100;
 
 enum
 {

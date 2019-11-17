@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -56,7 +56,8 @@ static void ride_update_station_blocksection(Ride* ride, int32_t stationIndex)
 {
     TileElement* tileElement = ride_get_station_start_track_element(ride, stationIndex);
 
-    if ((ride->status == RIDE_STATUS_CLOSED && ride->num_riders == 0) || (tileElement != nullptr && tileElement->flags & 0x20))
+    if ((ride->status == RIDE_STATUS_CLOSED && ride->num_riders == 0)
+        || (tileElement != nullptr && tileElement->AsTrack()->BlockBrakeClosed()))
     {
         ride->stations[stationIndex].Depart &= ~STATION_DEPART_FLAG;
 
@@ -206,7 +207,7 @@ static void ride_update_station_race(Ride* ride, int32_t stationIndex)
                 // Found a winner
                 if (vehicle->num_peeps != 0)
                 {
-                    rct_peep* peep = GET_PEEP(vehicle->peep[0]);
+                    Peep* peep = GET_PEEP(vehicle->peep[0]);
                     ride->race_winner = peep->sprite_index;
                     ride->window_invalidate_flags |= RIDE_INVALIDATE_RIDE_MAIN | RIDE_INVALIDATE_RIDE_LIST;
                 }
@@ -281,25 +282,31 @@ static void ride_race_init_vehicle_speeds(Ride* ride)
 
         if (vehicle->num_peeps != 0)
         {
-            rct_peep* peep = &get_sprite(vehicle->peep[0])->peep;
+            Peep* peep = &get_sprite(vehicle->peep[0])->peep;
 
-            switch (peep_get_easteregg_name_id(peep))
+            // Easter egg names should only work on guests
+            Guest* guest = peep->AsGuest();
+
+            if (guest != nullptr)
             {
-                case EASTEREGG_PEEP_NAME_MICHAEL_SCHUMACHER:
-                    vehicle->speed += 35;
-                    break;
-                case EASTEREGG_PEEP_NAME_JACQUES_VILLENEUVE:
-                    vehicle->speed += 25;
-                    break;
-                case EASTEREGG_PEEP_NAME_DAMON_HILL:
-                    vehicle->speed += 55;
-                    break;
-                case EASTEREGG_PEEP_NAME_CHRIS_SAWYER:
-                    vehicle->speed += 14;
-                    break;
-                case EASTEREGG_PEEP_NAME_MR_BEAN:
-                    vehicle->speed = 9;
-                    break;
+                switch (guest->GetEasterEggNameId())
+                {
+                    case EASTEREGG_PEEP_NAME_MICHAEL_SCHUMACHER:
+                        vehicle->speed += 35;
+                        break;
+                    case EASTEREGG_PEEP_NAME_JACQUES_VILLENEUVE:
+                        vehicle->speed += 25;
+                        break;
+                    case EASTEREGG_PEEP_NAME_DAMON_HILL:
+                        vehicle->speed += 55;
+                        break;
+                    case EASTEREGG_PEEP_NAME_CHRIS_SAWYER:
+                        vehicle->speed += 14;
+                        break;
+                    case EASTEREGG_PEEP_NAME_MR_BEAN:
+                        vehicle->speed = 9;
+                        break;
+                }
             }
         }
     }
@@ -333,6 +340,8 @@ TileElement* ride_get_station_start_track_element(Ride* ride, int32_t stationInd
 
     // Find the station track element
     TileElement* tileElement = map_get_first_element_at(x, y);
+    if (tileElement == nullptr)
+        return nullptr;
     do
     {
         if (tileElement->GetType() == TILE_ELEMENT_TYPE_TRACK && z == tileElement->base_height)
@@ -347,8 +356,12 @@ TileElement* ride_get_station_exit_element(int32_t x, int32_t y, int32_t z)
 {
     // Find the station track element
     TileElement* tileElement = map_get_first_element_at(x, y);
+    if (tileElement == nullptr)
+        return nullptr;
     do
     {
+        if (tileElement == nullptr)
+            break;
         if (tileElement->GetType() == TILE_ELEMENT_TYPE_ENTRANCE && z == tileElement->base_height)
             return tileElement;
     } while (!(tileElement++)->IsLastForTile());

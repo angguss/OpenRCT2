@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -12,6 +12,8 @@
 #include "../Cheats.h"
 #include "../Context.h"
 #include "../Game.h"
+#include "../actions/BannerRemoveAction.hpp"
+#include "../actions/FootpathSceneryRemoveAction.hpp"
 #include "../actions/LargeSceneryRemoveAction.hpp"
 #include "../actions/SmallSceneryRemoveAction.hpp"
 #include "../actions/WallRemoveAction.hpp"
@@ -39,7 +41,6 @@ colour_t gWindowScenerySecondaryColour;
 colour_t gWindowSceneryTertiaryColour;
 bool gWindowSceneryEyedropperEnabled;
 
-TileElement* gSceneryTileElement;
 uint8_t gSceneryQuadrant;
 
 money32 gSceneryPlaceCost;
@@ -62,8 +63,6 @@ int16_t gSceneryShiftPressZOffset;
 int16_t gSceneryCtrlPressed;
 int16_t gSceneryCtrlPressZ;
 
-uint8_t gSceneryGroundFlags;
-
 money32 gClearSceneryCost;
 
 // rct2: 0x009A3E74
@@ -74,6 +73,8 @@ void scenery_update_tile(int32_t x, int32_t y)
     TileElement* tileElement;
 
     tileElement = map_get_first_element_at(x >> 5, y >> 5);
+    if (tileElement == nullptr)
+        return;
     do
     {
         // Ghosts are purely this-client-side and should not cause any interaction,
@@ -97,11 +98,11 @@ void scenery_update_tile(int32_t x, int32_t y)
                 {
                     if (sceneryEntry->path_bit.flags & PATH_BIT_FLAG_JUMPING_FOUNTAIN_WATER)
                     {
-                        jumping_fountain_begin(JUMPING_FOUNTAIN_TYPE_WATER, x, y, tileElement);
+                        JumpingFountain::StartAnimation(JUMPING_FOUNTAIN_TYPE_WATER, { x, y }, tileElement);
                     }
                     else if (sceneryEntry->path_bit.flags & PATH_BIT_FLAG_JUMPING_FOUNTAIN_SNOW)
                     {
-                        jumping_fountain_begin(JUMPING_FOUNTAIN_TYPE_SNOW, x, y, tileElement);
+                        JumpingFountain::StartAnimation(JUMPING_FOUNTAIN_TYPE_SNOW, { x, y }, tileElement);
                     }
                 }
             }
@@ -138,7 +139,8 @@ void scenery_update_age(int32_t x, int32_t y, TileElement* tileElement)
 
     // Check map elements above, presumably to see if map element is blocked from rain
     tileElementAbove = tileElement;
-    while (!(tileElementAbove->flags & 7))
+    // Change from original: RCT2 only checked for the first three quadrants, which was very likely to be a bug.
+    while (!(tileElementAbove->GetOccupiedQuadrants()))
     {
         tileElementAbove++;
 
@@ -187,8 +189,9 @@ void scenery_remove_ghost_tool_placement()
     {
         gSceneryGhostType &= ~SCENERY_GHOST_FLAG_0;
 
-        auto removeSceneryAction = SmallSceneryRemoveAction(x, y, z, gSceneryQuadrant, gSceneryPlaceObject);
-        removeSceneryAction.SetFlags(GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_5 | GAME_COMMAND_FLAG_GHOST);
+        auto removeSceneryAction = SmallSceneryRemoveAction({ x, y, z * 8 }, gSceneryQuadrant, gSceneryPlaceObject);
+        removeSceneryAction.SetFlags(
+            GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_NO_SPEND | GAME_COMMAND_FLAG_GHOST);
         removeSceneryAction.Execute();
     }
 
@@ -199,15 +202,18 @@ void scenery_remove_ghost_tool_placement()
 
         do
         {
+            if (tileElement == nullptr)
+                break;
+
             if (tileElement->GetType() != TILE_ELEMENT_TYPE_PATH)
                 continue;
 
             if (tileElement->base_height != z)
                 continue;
 
-            game_do_command(
-                x, 233 | (gSceneryPlacePathSlope << 8), y, z | (gSceneryPlacePathType << 8), GAME_COMMAND_PLACE_PATH,
-                gSceneryGhostPathObjectType & 0xFFFF0000, 0);
+            auto footpathSceneryRemoveAction = FootpathSceneryRemoveAction({ x, y, z * 8 });
+            footpathSceneryRemoveAction.SetFlags(GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_GHOST);
+            GameActions::Execute(&footpathSceneryRemoveAction);
             break;
         } while (!(tileElement++)->IsLastForTile());
     }
@@ -216,7 +222,7 @@ void scenery_remove_ghost_tool_placement()
     {
         gSceneryGhostType &= ~SCENERY_GHOST_FLAG_2;
 
-        TileCoordsXYZD wallLocation = { x >> 5, y >> 5, z, gSceneryGhostWallRotation };
+        CoordsXYZD wallLocation = { x, y, z * 8, gSceneryGhostWallRotation };
         auto wallRemoveAction = WallRemoveAction(wallLocation);
         wallRemoveAction.SetFlags(GAME_COMMAND_FLAG_APPLY | GAME_COMMAND_FLAG_GHOST | GAME_COMMAND_FLAG_PATH_SCENERY);
         wallRemoveAction.Execute();
@@ -226,18 +232,21 @@ void scenery_remove_ghost_tool_placement()
     {
         gSceneryGhostType &= ~SCENERY_GHOST_FLAG_3;
 
-        auto removeSceneryAction = LargeSceneryRemoveAction(x, y, z, gSceneryPlaceRotation, 0);
+        auto removeSceneryAction = LargeSceneryRemoveAction({ x, y, z * 8, gSceneryPlaceRotation }, 0);
         removeSceneryAction.SetFlags(
-            GAME_COMMAND_FLAG_APPLY | GAME_COMMAND_FLAG_GHOST | GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_5);
+            GAME_COMMAND_FLAG_APPLY | GAME_COMMAND_FLAG_GHOST | GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED
+            | GAME_COMMAND_FLAG_NO_SPEND);
         removeSceneryAction.Execute();
     }
 
     if (gSceneryGhostType & SCENERY_GHOST_FLAG_4)
     {
         gSceneryGhostType &= ~SCENERY_GHOST_FLAG_4;
-        constexpr uint32_t flags = GAME_COMMAND_FLAG_APPLY | GAME_COMMAND_FLAG_GHOST | GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED
-            | GAME_COMMAND_FLAG_5;
-        game_do_command(x, flags, y, z | (gSceneryPlaceRotation << 8), GAME_COMMAND_REMOVE_BANNER, 0, 0);
+
+        auto removeSceneryAction = BannerRemoveAction({ x, y, z * 8, gSceneryPlaceRotation });
+        removeSceneryAction.SetFlags(
+            GAME_COMMAND_FLAG_GHOST | GAME_COMMAND_FLAG_ALLOW_DURING_PAUSED | GAME_COMMAND_FLAG_NO_SPEND);
+        GameActions::Execute(&removeSceneryAction);
     }
 }
 

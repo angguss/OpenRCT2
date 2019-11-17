@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,8 +15,8 @@
 #include <openrct2/localisation/Localisation.h>
 #include <openrct2/sprites.h>
 
-#define INITIAL_WIDTH 500
-#define INITIAL_HEIGHT 350
+constexpr int32_t INITIAL_WIDTH = 500;
+constexpr int32_t INITIAL_HEIGHT = 350;
 
 // clang-format off
 enum {
@@ -94,7 +94,7 @@ rct_window* window_viewport_open()
     w->number = _viewportNumber++;
 
     // Create viewport
-    viewport_create(w, w->x, w->y, w->width, w->height, 0, 128 * 32, 128 * 32, 0, 1, -1);
+    viewport_create(w, w->x, w->y, w->width, w->height, 0, 128 * 32, 128 * 32, 0, 1, SPRITE_INDEX_NULL);
     rct_window* mainWindow = window_get_main();
     if (mainWindow != nullptr)
     {
@@ -135,14 +135,14 @@ static void window_viewport_mouseup(rct_window* w, rct_widgetindex widgetIndex)
             if (w->viewport != nullptr && w->viewport->zoom > 0)
             {
                 w->viewport->zoom--;
-                window_invalidate(w);
+                w->Invalidate();
             }
             break;
         case WIDX_ZOOM_OUT:
             if (w->viewport != nullptr && w->viewport->zoom < 3)
             {
                 w->viewport->zoom++;
-                window_invalidate(w);
+                w->Invalidate();
             }
             break;
         case WIDX_LOCATE:
@@ -152,7 +152,7 @@ static void window_viewport_mouseup(rct_window* w, rct_widgetindex widgetIndex)
                 get_map_coordinates_from_pos(
                     w->x + (w->width / 2), w->y + (w->height / 2), VIEWPORT_INTERACTION_MASK_NONE, &x, &y, nullptr, nullptr,
                     nullptr);
-                window_scroll_to_location(mainWindow, x, y, tile_element_height(x, y));
+                window_scroll_to_location(mainWindow, x, y, tile_element_height({ x, y }));
             }
             break;
     }
@@ -175,7 +175,7 @@ static void window_viewport_update(rct_window* w)
     if (w->viewport->flags != mainWindow->viewport->flags)
     {
         w->viewport->flags = mainWindow->viewport->flags;
-        window_invalidate(w);
+        w->Invalidate();
     }
 
     // Not sure how to invalidate part of the viewport that has changed, this will have to do for now

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -10,6 +10,8 @@
 #pragma once
 
 #include "../common.h"
+
+#include <string>
 
 struct GeneralConfiguration
 {
@@ -30,6 +32,7 @@ struct GeneralConfiguration
     bool uncap_fps;
     bool use_vsync;
     bool show_fps;
+    bool multithreading;
     bool minimize_fullscreen_focus_loss;
 
     // Map rendering
@@ -43,6 +46,7 @@ struct GeneralConfiguration
     bool render_weather_gloom;
     bool disable_lightning_effect;
     bool show_guest_purchases;
+    bool transparent_screenshot;
 
     // Localisation
     int32_t language;
@@ -67,8 +71,6 @@ struct GeneralConfiguration
     int32_t window_snap_proximity;
     bool allow_loading_with_incorrect_checksum;
     bool save_plugin_data;
-    bool test_unfinished_tracks;
-    bool no_test_crashes;
     bool debugging_tools;
     int32_t autosave_frequency;
     int32_t autosave_amount;
@@ -107,6 +109,7 @@ struct InterfaceConfiguration
     utf8* current_theme_preset;
     utf8* current_title_sequence_preset;
     int32_t object_selection_filter_flags;
+    int32_t scenarioselect_last_tab;
 };
 
 struct SoundConfiguration
@@ -135,24 +138,25 @@ struct TwitchConfiguration
 
 struct NetworkConfiguration
 {
-    utf8* player_name;
+    std::string player_name;
     int32_t default_port;
-    char* listen_address;
-    utf8* default_password;
+    std::string listen_address;
+    std::string default_password;
     bool stay_connected;
     bool advertise;
     int32_t maxplayers;
-    utf8* server_name;
-    utf8* server_description;
-    utf8* server_greeting;
-    utf8* master_server_url;
-    utf8* provider_name;
-    utf8* provider_email;
-    utf8* provider_website;
+    std::string server_name;
+    std::string server_description;
+    std::string server_greeting;
+    std::string master_server_url;
+    std::string provider_name;
+    std::string provider_email;
+    std::string provider_website;
     bool known_keys_only;
     bool log_chat;
     bool log_server_actions;
     bool pause_server_if_no_clients;
+    bool desync_debugging;
 };
 
 struct NotificationConfiguration

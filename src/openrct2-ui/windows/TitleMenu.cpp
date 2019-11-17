@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -16,6 +16,7 @@
 #include <openrct2/Input.h>
 #include <openrct2/ParkImporter.h>
 #include <openrct2/PlatformEnvironment.h>
+#include <openrct2/actions/LoadOrQuitAction.hpp>
 #include <openrct2/config/Config.h>
 #include <openrct2/localisation/Localisation.h>
 #include <openrct2/sprites.h>
@@ -84,7 +85,7 @@ rct_window* window_title_menu_open()
     rct_window* window;
 
     window = window_create(
-        0, context_get_height() - 154, 0, 100, &window_title_menu_events, WC_TITLE_MENU,
+        ScreenCoordsXY(0, context_get_height() - 154), 0, 100, &window_title_menu_events, WC_TITLE_MENU,
         WF_STICK_TO_BACK | WF_TRANSPARENT | WF_NO_BACKGROUND);
     window->widgets = window_title_menu_widgets;
     window->enabled_widgets
@@ -153,7 +154,8 @@ static void window_title_menu_mouseup(rct_window* w, rct_widgetindex widgetIndex
             {
                 window_close_by_class(WC_SCENARIO_SELECT);
                 window_close_by_class(WC_SERVER_LIST);
-                game_do_command(0, 1, 0, 0, GAME_COMMAND_LOAD_OR_QUIT, 0, 0);
+                auto loadOrQuitAction = LoadOrQuitAction(LoadOrQuitModes::OpenSavePrompt);
+                GameActions::Execute(&loadOrQuitAction);
             }
             break;
         case WIDX_MULTIPLAYER:

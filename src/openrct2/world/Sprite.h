@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -13,10 +13,11 @@
 #include "../common.h"
 #include "../peep/Peep.h"
 #include "../ride/Vehicle.h"
+#include "Fountain.h"
+#include "SpriteBase.h"
 
 #define SPRITE_INDEX_NULL 0xFFFF
 #define MAX_SPRITES 10000
-#define NUM_SPRITE_LISTS 6
 
 enum SPRITE_IDENTIFIER
 {
@@ -29,80 +30,36 @@ enum SPRITE_IDENTIFIER
 
 enum SPRITE_LIST
 {
-    SPRITE_LIST_NULL,
-    SPRITE_LIST_TRAIN,
+    SPRITE_LIST_FREE,
+    SPRITE_LIST_VEHICLE_HEAD,
     SPRITE_LIST_PEEP,
     SPRITE_LIST_MISC,
     SPRITE_LIST_LITTER,
-    SPRITE_LIST_UNKNOWN,
+    SPRITE_LIST_VEHICLE,
+    SPRITE_LIST_COUNT,
 };
-
-#pragma pack(push, 1)
-struct rct_sprite_common
-{
-    uint8_t sprite_identifier;       // 0x00
-    uint8_t type;                    // 0x01
-    uint16_t next_in_quadrant;       // 0x02
-    uint16_t next;                   // 0x04
-    uint16_t previous;               // 0x06
-    uint8_t linked_list_type_offset; // 0x08 Valid values are SPRITE_LINKEDLIST_OFFSET_...
-    // Height from centre of sprite to bottom
-    uint8_t sprite_height_negative; // 0x09
-    uint16_t sprite_index;          // 0x0A
-    uint16_t flags;                 // 0x0C
-    int16_t x;                      // 0x0E
-    int16_t y;                      // 0x10
-    int16_t z;                      // 0x12
-    // Width from centre of sprite to edge
-    uint8_t sprite_width; // 0x14
-    // Height from centre of sprite to top
-    uint8_t sprite_height_positive; // 0x15
-    int16_t sprite_left;            // 0x16
-    int16_t sprite_top;             // 0x18
-    int16_t sprite_right;           // 0x1A
-    int16_t sprite_bottom;          // 0x1C
-    uint8_t sprite_direction;       // 0x1e
-    uint8_t pad_1F[3];
-    rct_string_id name_string_idx; // 0x22
-};
-
-struct rct_sprite_generic : rct_sprite_common
-{
-    uint16_t pad_24;
-    uint16_t frame; // 0x26
-};
-assert_struct_size(rct_sprite_generic, 0x28); // 9 bytes
 
 struct rct_litter : rct_sprite_common
 {
-    uint32_t creationTick; // 0x24
+    uint32_t creationTick;
 };
-assert_struct_size(rct_litter, 0x28);
 
-struct rct_balloon : rct_sprite_common
+struct rct_balloon : rct_sprite_generic
 {
-    uint16_t popped;      // 0x24
-    uint8_t time_to_move; // 0x26
-
-    uint8_t frame; // 0x27
-    uint8_t pad_28[4];
-    uint8_t colour; // 0x2C
+    uint16_t popped;
+    uint8_t time_to_move;
+    uint8_t colour;
 
     void Update();
     void Pop();
     void Press();
 };
-assert_struct_size(rct_balloon, 0x2D);
 
-struct rct_duck : rct_sprite_common
+struct rct_duck : rct_sprite_generic
 {
-    uint8_t pad_1F[0x2];
-    uint16_t frame;
-    uint8_t pad_28[0x8];
-    int16_t target_x; // 0x30
-    int16_t target_y; // 0x32
-    uint8_t pad_34[0x14];
-    uint8_t state; // 0x48
+    int16_t target_x;
+    int16_t target_y;
+    uint8_t state;
 
     void UpdateFlyToWater();
     void UpdateSwim();
@@ -114,65 +71,45 @@ struct rct_duck : rct_sprite_common
     void Remove();
     void MoveTo(int16_t x, int16_t y, int16_t z);
 };
-assert_struct_size(rct_duck, 0x49);
-
-struct rct_jumping_fountain : rct_sprite_common
-{
-    uint8_t pad_1F[0x2];
-    uint8_t num_ticks_alive; // 0x26
-    uint8_t frame;           // 0x27
-    uint8_t pad_28[0x7];     // 0x28 Originally var_2E was set to direction but it was unused.
-    uint8_t fountain_flags;  // 0x2F
-    int16_t target_x;        // 0x30
-    int16_t target_y;        // 0x32
-    uint8_t pad_34[0x12];
-    uint16_t iteration; // 0x46
-};
-assert_struct_size(rct_jumping_fountain, 0x48);
 
 struct rct_money_effect : rct_sprite_common
 {
-    uint16_t move_delay;   // 0x24
-    uint8_t num_movements; // 0x26
+    uint16_t move_delay;
+    uint8_t num_movements;
     uint8_t vertical;
-    money32 value; // 0x28
-    uint8_t pad_2C[0x18];
-    int16_t offset_x; // 0x44
-    uint16_t wiggle;  // 0x46
-};
-assert_struct_size(rct_money_effect, 0x48);
+    money32 value;
+    int16_t offset_x;
+    uint16_t wiggle;
 
-struct rct_crashed_vehicle_particle : rct_sprite_common
+    static void CreateAt(money32 value, int32_t x, int32_t y, int32_t z, bool vertical);
+    static void Create(money32 value);
+    void Update();
+    std::pair<rct_string_id, money32> GetStringId() const;
+};
+
+struct rct_crashed_vehicle_particle : rct_sprite_generic
 {
-    uint16_t time_to_live; // 0x24
-    uint16_t frame;        // 0x26
-    uint8_t pad_28[4];
+    uint16_t time_to_live;
     uint8_t colour[2];
-    uint16_t crashed_sprite_base; // 0x2E
-    int16_t velocity_x;           // 0x30
-    int16_t velocity_y;           // 0x32
-    int16_t velocity_z;           // 0x34
-    uint16_t pad_36;
-    int32_t acceleration_x; // 0x38
-    int32_t acceleration_y; // 0x3C
-    int32_t acceleration_z; // 0x40
+    uint16_t crashed_sprite_base;
+    int16_t velocity_x;
+    int16_t velocity_y;
+    int16_t velocity_z;
+    int32_t acceleration_x;
+    int32_t acceleration_y;
+    int32_t acceleration_z;
 };
-assert_struct_size(rct_crashed_vehicle_particle, 0x44);
 
-struct rct_crash_splash : rct_sprite_common
+struct rct_crash_splash : rct_sprite_generic
 {
-    uint16_t pad_24;
-    uint16_t frame; // 0x26
 };
-assert_struct_size(rct_crash_splash, 0x28);
 
-struct rct_steam_particle : rct_sprite_common
+struct rct_steam_particle : rct_sprite_generic
 {
-    uint16_t time_to_move; // 0x24 Moves +1 z every 3 ticks after intitial 4 ticks
-    uint16_t frame;        // 0x26
+    uint16_t time_to_move;
 };
-assert_struct_size(rct_steam_particle, 0x28);
 
+#pragma pack(push, 1)
 /**
  * Sprite structure.
  * size: 0x0100
@@ -181,12 +118,12 @@ union rct_sprite
 {
     uint8_t pad_00[0x100];
     rct_sprite_generic generic;
-    rct_peep peep;
+    Peep peep;
     rct_litter litter;
     rct_vehicle vehicle;
     rct_balloon balloon;
     rct_duck duck;
-    rct_jumping_fountain jumping_fountain;
+    JumpingFountain jumping_fountain;
     rct_money_effect money_effect;
     rct_crashed_vehicle_particle crashed_vehicle_particle;
     rct_crash_splash crash_splash;
@@ -194,10 +131,12 @@ union rct_sprite
 
     bool IsBalloon();
     bool IsDuck();
+    bool IsMoneyEffect();
     bool IsPeep();
     rct_balloon* AsBalloon();
     rct_duck* AsDuck();
-    rct_peep* AsPeep();
+    rct_money_effect* AsMoneyEffect();
+    Peep* AsPeep();
 };
 assert_struct_size(rct_sprite, 0x100);
 
@@ -256,11 +195,11 @@ extern uint16_t gSpriteSpatialIndex[0x10001];
 
 extern const rct_string_id litterNames[12];
 
-rct_sprite* create_sprite(uint8_t bl);
+rct_sprite* create_sprite(SPRITE_IDENTIFIER spriteIdentifier);
 void reset_sprite_list();
 void reset_sprite_spatial_index();
 void sprite_clear_all_unused();
-void move_sprite_to_list(rct_sprite* sprite, uint8_t cl);
+void move_sprite_to_list(rct_sprite* sprite, SPRITE_LIST newList);
 void sprite_misc_update_all();
 void sprite_move(int16_t x, int16_t y, int16_t z, rct_sprite* sprite);
 void sprite_set_coordinates(int16_t x, int16_t y, int16_t z, rct_sprite* sprite);
@@ -284,25 +223,15 @@ void sprite_position_tween_reset();
 ///////////////////////////////////////////////////////////////
 void create_balloon(int32_t x, int32_t y, int32_t z, int32_t colour, bool isPopped);
 void balloon_update(rct_balloon* balloon);
-void game_command_balloon_press(
-    int32_t* eax, int32_t* ebx, int32_t* ecx, int32_t* edx, int32_t* esi, int32_t* edi, int32_t* ebp);
 
 ///////////////////////////////////////////////////////////////
 // Duck
 ///////////////////////////////////////////////////////////////
-void create_duck(int32_t targetX, int32_t targetY);
+void create_duck(const CoordsXY& pos);
 void duck_update(rct_duck* duck);
 void duck_press(rct_duck* duck);
 void duck_remove_all();
 uint32_t duck_get_frame_image(const rct_duck* duck, int32_t direction);
-
-///////////////////////////////////////////////////////////////
-// Money effect
-///////////////////////////////////////////////////////////////
-void money_effect_create(money32 value);
-void money_effect_create_at(money32 value, int32_t x, int32_t y, int32_t z, bool vertical);
-void money_effect_update(rct_money_effect* moneyEffect);
-rct_string_id money_effect_get_string_id(const rct_money_effect* sprite, money32* outValue);
 
 ///////////////////////////////////////////////////////////////
 // Crash particles

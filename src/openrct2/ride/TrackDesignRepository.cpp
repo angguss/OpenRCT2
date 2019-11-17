@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -63,12 +63,12 @@ private:
 public:
     explicit TrackDesignFileIndex(const IPlatformEnvironment& env)
         : FileIndex(
-              "track design index", MAGIC_NUMBER, VERSION, env.GetFilePath(PATHID::CACHE_TRACKS), std::string(PATTERN),
-              std::vector<std::string>({
-                  env.GetDirectoryPath(DIRBASE::RCT1, DIRID::TRACK),
-                  env.GetDirectoryPath(DIRBASE::RCT2, DIRID::TRACK),
-                  env.GetDirectoryPath(DIRBASE::USER, DIRID::TRACK),
-              }))
+            "track design index", MAGIC_NUMBER, VERSION, env.GetFilePath(PATHID::CACHE_TRACKS), std::string(PATTERN),
+            std::vector<std::string>({
+                env.GetDirectoryPath(DIRBASE::RCT1, DIRID::TRACK),
+                env.GetDirectoryPath(DIRBASE::RCT2, DIRID::TRACK),
+                env.GetDirectoryPath(DIRBASE::USER, DIRID::TRACK),
+            }))
     {
     }
 
@@ -88,7 +88,6 @@ public:
             {
                 item.Flags |= TRIF_READ_ONLY;
             }
-            track_design_dispose(td6);
             return std::make_tuple(true, item);
         }
         else

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -154,52 +154,36 @@ void vehicle_visual_virginia_reel(
     paint_session* session, int32_t x, int32_t imageDirection, int32_t y, int32_t z, const rct_vehicle* vehicle,
     const rct_ride_entry_vehicle* vehicleEntry)
 {
-    int32_t image_id;
-    int32_t baseImage_id = imageDirection;
     const uint8_t rotation = session->CurrentRotation;
     int32_t ecx = ((vehicle->spin_sprite / 8) + (rotation * 8)) & 31;
-    int32_t j = 0;
-    if (vehicle->vehicle_sprite_type == 0)
-    {
-        baseImage_id = ecx & 7;
-    }
-    else
-    {
-        if (vehicle->vehicle_sprite_type == 1 || vehicle->vehicle_sprite_type == 5)
+    int32_t baseImage_id = [&] {
+        switch (vehicle->vehicle_sprite_type)
         {
-            if (vehicle->vehicle_sprite_type == 5)
-            {
-                baseImage_id = imageDirection ^ 16;
-            }
-            baseImage_id &= 24;
-            j = (baseImage_id / 8) + 1;
-            baseImage_id += (ecx & 7);
-            baseImage_id += 8;
+            case 1:
+                return (imageDirection & 24) + 8;
+            case 2:
+                return (imageDirection & 24) + 40;
+            case 5:
+                return ((imageDirection ^ 16) & 24) + 8;
+            case 6:
+                return ((imageDirection ^ 16) & 24) + 40;
+            default:
+                return 0;
         }
-        else if (vehicle->vehicle_sprite_type == 2 || vehicle->vehicle_sprite_type == 6)
-        {
-            if (vehicle->vehicle_sprite_type == 6)
-            {
-                baseImage_id = imageDirection ^ 16;
-            }
-            baseImage_id &= 24;
-            j = (baseImage_id / 8) + 5;
-            baseImage_id += (ecx & 7);
-            baseImage_id += 40;
-        }
-        else
-        {
-            baseImage_id = ecx & 7;
-        }
-    }
-    baseImage_id += vehicleEntry->base_image_id;
+    }();
+    baseImage_id += ecx & 7;
+    const vehicle_boundbox* bb = &_virginiaReelBoundbox[baseImage_id >> 3];
 
-    const vehicle_boundbox* bb = &_virginiaReelBoundbox[j];
-    image_id = baseImage_id | SPRITE_ID_PALETTE_COLOUR_2(vehicle->colours.body_colour, vehicle->colours.trim_colour);
+    baseImage_id += vehicleEntry->base_image_id;
+    int32_t image_id = baseImage_id | SPRITE_ID_PALETTE_COLOUR_2(vehicle->colours.body_colour, vehicle->colours.trim_colour);
+    if (vehicle->IsGhost())
+    {
+        image_id = (image_id & 0x7FFFF) | CONSTRUCTION_MARKER;
+    }
     sub_98197C(
         session, image_id, 0, 0, bb->length_x, bb->length_y, bb->length_z, z, bb->offset_x, bb->offset_y, bb->offset_z + z);
 
-    if (session->DPI->zoom_level < 2 && vehicle->num_peeps > 0)
+    if (session->DPI.zoom_level < 2 && vehicle->num_peeps > 0 && !vehicle->IsGhost())
     {
         uint8_t riding_peep_sprites[4] = { 0xFF, 0xFF, 0xFF, 0xFF };
         for (int32_t i = 0; i < vehicle->num_peeps; i++)

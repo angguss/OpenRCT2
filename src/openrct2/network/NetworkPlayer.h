@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,6 +15,7 @@
 #include "../world/Sprite.h"
 
 #include <string>
+#include <unordered_map>
 
 class NetworkPacket;
 
@@ -31,12 +32,12 @@ public:
     int32_t LastAction = -999;
     uint32_t LastActionTime = 0;
     LocationXYZ16 LastActionCoord = {};
-    rct_peep* PickupPeep = nullptr;
+    Peep* PickupPeep = nullptr;
     int32_t PickupPeepOldX = LOCATION_NULL;
     std::string KeyHash;
     uint32_t LastDemolishRideTime = 0;
     uint32_t LastPlaceSceneryTime = 0;
-
+    std::unordered_map<uint32_t, int32_t> CooldownTime;
     NetworkPlayer() = default;
 
     void SetName(const std::string& name);

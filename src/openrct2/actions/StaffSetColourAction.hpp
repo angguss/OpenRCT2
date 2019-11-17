@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -66,7 +66,7 @@ public:
 
         // Update each staff member's uniform
         int32_t spriteIndex;
-        rct_peep* peep;
+        Peep* peep;
         FOR_ALL_PEEPS (spriteIndex, peep)
         {
             if (peep->type == PEEP_TYPE_STAFF && peep->staff_type == _staffType)

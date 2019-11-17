@@ -26,8 +26,8 @@ enum {
     WINDOW_NETWORK_PAGE_INFORMATION,
 };
 
-#define WW 450
-#define WH 210
+constexpr int32_t WW = 450;
+constexpr int32_t WH = 210;
 
 enum WINDOW_NETWORK_WIDGET_IDX {
     WIDX_BACKGROUND,
@@ -186,7 +186,7 @@ static void window_network_set_page(rct_window* w, int32_t page)
     window_event_resize_call(w);
     window_event_invalidate_call(w);
     window_init_scroll_widgets(w);
-    window_invalidate(w);
+    w->Invalidate();
 }
 
 static void window_network_anchor_border_widgets(rct_window* w)
@@ -237,7 +237,7 @@ static void window_network_information_update(rct_window* w)
 {
     w->frame_no++;
     widget_invalidate(w, WIDX_TAB1 + w->page);
-    window_invalidate(w);
+    w->Invalidate();
 
     NetworkStats_t curStats = network_get_stats();
 

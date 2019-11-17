@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -53,7 +53,7 @@ public:
             return std::make_unique<GameActionResult>(GA_ERROR::INVALID_PARAMETERS, STR_NONE);
         }
 
-        rct_peep* peep = GET_PEEP(_spriteIndex);
+        Peep* peep = GET_PEEP(_spriteIndex);
         if (peep->type != PEEP_TYPE_STAFF
             || (peep->staff_type != STAFF_TYPE_HANDYMAN && peep->staff_type != STAFF_TYPE_MECHANIC))
         {
@@ -66,7 +66,7 @@ public:
 
     GameActionResult::Ptr Execute() const override
     {
-        rct_peep* peep = GET_PEEP(_spriteIndex);
+        Peep* peep = GET_PEEP(_spriteIndex);
 
         peep->staff_orders = _ordersId;
 

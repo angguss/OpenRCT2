@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -26,13 +26,15 @@ void NetworkPlayer::Read(NetworkPacket& packet)
 {
     const utf8* name = packet.ReadString();
     SetName(name);
-    packet >> Id >> Flags >> Group;
+    packet >> Id >> Flags >> Group >> LastAction >> LastActionCoord.x >> LastActionCoord.y >> LastActionCoord.z >> MoneySpent
+        >> CommandsRan;
 }
 
 void NetworkPlayer::Write(NetworkPacket& packet)
 {
     packet.WriteString((const char*)Name.c_str());
-    packet << Id << Flags << Group;
+    packet << Id << Flags << Group << LastAction << LastActionCoord.x << LastActionCoord.y << LastActionCoord.z << MoneySpent
+           << CommandsRan;
 }
 
 void NetworkPlayer::AddMoneySpent(money32 cost)

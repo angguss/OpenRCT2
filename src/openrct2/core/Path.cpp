@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -170,6 +170,7 @@ namespace Path
 
     utf8* GetAbsolute(utf8* buffer, size_t bufferSize, const utf8* relativePath)
     {
+<<<<<<< HEAD
 #ifdef ENABLE_PHYSFS
         if (relativePath != nullptr)
         {
@@ -183,18 +184,20 @@ namespace Path
         return buffer;
 #elif defined(_WIN32)
         wchar_t* relativePathW = utf8_to_widechar(relativePath);
+=======
+#ifdef _WIN32
+        auto relativePathW = String::ToWideChar(relativePath);
+>>>>>>> develop
         wchar_t absolutePathW[MAX_PATH];
-        DWORD length = GetFullPathNameW(relativePathW, (DWORD)std::size(absolutePathW), absolutePathW, nullptr);
-        Memory::Free(relativePathW);
+        DWORD length = GetFullPathNameW(relativePathW.c_str(), (DWORD)std::size(absolutePathW), absolutePathW, nullptr);
         if (length == 0)
         {
             return String::Set(buffer, bufferSize, relativePath);
         }
         else
         {
-            utf8* absolutePath = widechar_to_utf8(absolutePathW);
-            String::Set(buffer, bufferSize, absolutePath);
-            Memory::Free(absolutePath);
+            auto absolutePath = String::ToUtf8(absolutePathW);
+            String::Set(buffer, bufferSize, absolutePath.c_str());
             return buffer;
         }
 #else

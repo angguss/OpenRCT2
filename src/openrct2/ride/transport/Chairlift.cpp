@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -132,7 +132,7 @@ static const TileElement* chairlift_paint_util_map_get_track_element_at_from_rid
 };
 
 static bool chairlift_paint_util_is_first_track(
-    ride_id_t rideIndex, const TileElement* tileElement, LocationXY16 pos, uint8_t trackType)
+    ride_id_t rideIndex, const TileElement* tileElement, CoordsXY pos, uint8_t trackType)
 {
     if (tileElement->AsTrack()->GetTrackType() != TRACK_ELEM_BEGIN_STATION)
     {
@@ -152,7 +152,7 @@ static bool chairlift_paint_util_is_first_track(
 }
 
 static bool chairlift_paint_util_is_last_track(
-    ride_id_t rideIndex, const TileElement* tileElement, LocationXY16 pos, uint8_t trackType)
+    ride_id_t rideIndex, const TileElement* tileElement, CoordsXY pos, uint8_t trackType)
 {
     if (tileElement->AsTrack()->GetTrackType() != TRACK_ELEM_END_STATION)
     {
@@ -175,13 +175,15 @@ static void chairlift_paint_station_ne_sw(
     paint_session* session, ride_id_t rideIndex, uint8_t trackSequence, uint8_t direction, int32_t height,
     const TileElement* tileElement)
 {
-    const LocationXY16 pos = session->MapPosition;
+    auto ride = get_ride(rideIndex);
+    if (ride == nullptr)
+        return;
+
+    const CoordsXY pos = session->MapPosition;
     uint8_t trackType = tileElement->AsTrack()->GetTrackType();
-    Ride* ride = get_ride(rideIndex);
     uint32_t imageId;
 
     bool isStart = chairlift_paint_util_is_first_track(rideIndex, tileElement, pos, trackType);
-    ;
     bool isEnd = chairlift_paint_util_is_last_track(rideIndex, tileElement, pos, trackType);
 
     auto stationObj = ride_get_station_object(ride);
@@ -266,13 +268,15 @@ static void chairlift_paint_station_se_nw(
     paint_session* session, ride_id_t rideIndex, uint8_t trackSequence, uint8_t direction, int32_t height,
     const TileElement* tileElement)
 {
-    const LocationXY16 pos = session->MapPosition;
+    auto ride = get_ride(rideIndex);
+    if (ride == nullptr)
+        return;
+
+    const CoordsXY pos = session->MapPosition;
     uint8_t trackType = tileElement->AsTrack()->GetTrackType();
-    Ride* ride = get_ride(rideIndex);
     uint32_t imageId;
 
     bool isStart = chairlift_paint_util_is_first_track(rideIndex, tileElement, pos, trackType);
-    ;
     bool isEnd = chairlift_paint_util_is_last_track(rideIndex, tileElement, pos, trackType);
 
     auto stationObj = ride_get_station_object(ride);

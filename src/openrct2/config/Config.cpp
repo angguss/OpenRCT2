@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -170,11 +170,6 @@ namespace Config
             model->use_vsync = reader->GetBoolean("use_vsync", true);
             model->virtual_floor_style = reader->GetEnum<int32_t>(
                 "virtual_floor_style", VIRTUAL_FLOOR_STYLE_GLASSY, Enum_VirtualFloorStyle);
-
-            // Default config setting is false until ghost trains are implemented #4540
-            model->test_unfinished_tracks = reader->GetBoolean("test_unfinished_tracks", false);
-
-            model->no_test_crashes = reader->GetBoolean("no_test_crashes", false);
             model->date_format = reader->GetEnum<int32_t>("date_format", platform_get_locale_date_format(), Enum_DateFormat);
             model->auto_staff_placement = reader->GetBoolean("auto_staff", true);
             model->handymen_mow_default = reader->GetBoolean("handymen_mow_default", false);
@@ -195,6 +190,7 @@ namespace Config
             model->window_scale = reader->GetFloat("window_scale", platform_get_default_scale());
             model->scale_quality = reader->GetEnum<int32_t>("scale_quality", SCALE_QUALITY_SMOOTH_NN, Enum_ScaleQuality);
             model->show_fps = reader->GetBoolean("show_fps", false);
+            model->multithreading = reader->GetBoolean("multi_threading", false);
             model->trap_cursor = reader->GetBoolean("trap_cursor", false);
             model->auto_open_shops = reader->GetBoolean("auto_open_shops", false);
             model->scenario_select_mode = reader->GetInt32("scenario_select_mode", SCENARIO_SELECT_MODE_ORIGIN);
@@ -212,6 +208,7 @@ namespace Config
             model->show_guest_purchases = reader->GetBoolean("show_guest_purchases", false);
             model->show_real_names_of_guests = reader->GetBoolean("show_real_names_of_guests", true);
             model->allow_early_completion = reader->GetBoolean("allow_early_completion", false);
+            model->transparent_screenshot = reader->GetBoolean("transparent_screenshot", true);
         }
     }
 
@@ -249,8 +246,6 @@ namespace Config
         writer->WriteEnum<int32_t>("drawing_engine", model->drawing_engine, Enum_DrawingEngine);
         writer->WriteBoolean("uncap_fps", model->uncap_fps);
         writer->WriteBoolean("use_vsync", model->use_vsync);
-        writer->WriteBoolean("test_unfinished_tracks", model->test_unfinished_tracks);
-        writer->WriteBoolean("no_test_crashes", model->no_test_crashes);
         writer->WriteEnum<int32_t>("date_format", model->date_format, Enum_DateFormat);
         writer->WriteBoolean("auto_staff", model->auto_staff_placement);
         writer->WriteBoolean("handymen_mow_default", model->handymen_mow_default);
@@ -268,6 +263,7 @@ namespace Config
         writer->WriteFloat("window_scale", model->window_scale);
         writer->WriteEnum<int32_t>("scale_quality", model->scale_quality, Enum_ScaleQuality);
         writer->WriteBoolean("show_fps", model->show_fps);
+        writer->WriteBoolean("multi_threading", model->multithreading);
         writer->WriteBoolean("trap_cursor", model->trap_cursor);
         writer->WriteBoolean("auto_open_shops", model->auto_open_shops);
         writer->WriteInt32("scenario_select_mode", model->scenario_select_mode);
@@ -286,6 +282,7 @@ namespace Config
         writer->WriteBoolean("show_real_names_of_guests", model->show_real_names_of_guests);
         writer->WriteBoolean("allow_early_completion", model->allow_early_completion);
         writer->WriteEnum<int32_t>("virtual_floor_style", model->virtual_floor_style, Enum_VirtualFloorStyle);
+        writer->WriteBoolean("transparent_screenshot", model->transparent_screenshot);
     }
 
     static void ReadInterface(IIniReader* reader)
@@ -303,6 +300,7 @@ namespace Config
             model->current_theme_preset = reader->GetCString("current_theme", "*RCT2");
             model->current_title_sequence_preset = reader->GetCString("current_title_sequence", "*OPENRCT2");
             model->object_selection_filter_flags = reader->GetInt32("object_selection_filter_flags", 0x3FFF);
+            model->scenarioselect_last_tab = reader->GetInt32("scenarioselect_last_tab", 0);
         }
     }
 
@@ -320,6 +318,7 @@ namespace Config
         writer->WriteString("current_theme", model->current_theme_preset);
         writer->WriteString("current_title_sequence", model->current_title_sequence_preset);
         writer->WriteInt32("object_selection_filter_flags", model->object_selection_filter_flags);
+        writer->WriteInt32("scenarioselect_last_tab", model->scenarioselect_last_tab);
     }
 
     static void ReadSound(IIniReader* reader)
@@ -363,7 +362,7 @@ namespace Config
             auto playerName = reader->GetString("player_name", "");
             if (playerName.empty())
             {
-                playerName = String::ToStd(platform_get_username());
+                playerName = platform_get_username();
                 if (playerName.empty())
                 {
                     playerName = "Player";
@@ -377,22 +376,23 @@ namespace Config
             auto model = &gConfigNetwork;
             model->player_name = String::Duplicate(playerName);
             model->default_port = reader->GetInt32("default_port", NETWORK_DEFAULT_PORT);
-            model->listen_address = reader->GetCString("listen_address", "");
-            model->default_password = reader->GetCString("default_password", nullptr);
+            model->listen_address = reader->GetString("listen_address", "");
+            model->default_password = reader->GetString("default_password", "");
             model->stay_connected = reader->GetBoolean("stay_connected", true);
             model->advertise = reader->GetBoolean("advertise", true);
             model->maxplayers = reader->GetInt32("maxplayers", 16);
-            model->server_name = reader->GetCString("server_name", "Server");
-            model->server_description = reader->GetCString("server_description", nullptr);
-            model->server_greeting = reader->GetCString("server_greeting", nullptr);
-            model->master_server_url = reader->GetCString("master_server_url", nullptr);
-            model->provider_name = reader->GetCString("provider_name", nullptr);
-            model->provider_email = reader->GetCString("provider_email", nullptr);
-            model->provider_website = reader->GetCString("provider_website", nullptr);
+            model->server_name = reader->GetString("server_name", "Server");
+            model->server_description = reader->GetString("server_description", "");
+            model->server_greeting = reader->GetString("server_greeting", "");
+            model->master_server_url = reader->GetString("master_server_url", "");
+            model->provider_name = reader->GetString("provider_name", "");
+            model->provider_email = reader->GetString("provider_email", "");
+            model->provider_website = reader->GetString("provider_website", "");
             model->known_keys_only = reader->GetBoolean("known_keys_only", false);
             model->log_chat = reader->GetBoolean("log_chat", false);
             model->log_server_actions = reader->GetBoolean("log_server_actions", false);
             model->pause_server_if_no_clients = reader->GetBoolean("pause_server_if_no_clients", false);
+            model->desync_debugging = reader->GetBoolean("desync_debugging", false);
         }
     }
 
@@ -418,6 +418,7 @@ namespace Config
         writer->WriteBoolean("log_chat", model->log_chat);
         writer->WriteBoolean("log_server_actions", model->log_server_actions);
         writer->WriteBoolean("pause_server_if_no_clients", model->pause_server_if_no_clients);
+        writer->WriteBoolean("desync_debugging", model->desync_debugging);
     }
 
     static void ReadNotifications(IIniReader* reader)
@@ -753,16 +754,6 @@ void config_release()
     SafeFree(gConfigSound.device);
     SafeFree(gConfigTwitch.api_url);
     SafeFree(gConfigTwitch.channel);
-    SafeFree(gConfigNetwork.player_name);
-    SafeFree(gConfigNetwork.listen_address);
-    SafeFree(gConfigNetwork.default_password);
-    SafeFree(gConfigNetwork.server_name);
-    SafeFree(gConfigNetwork.server_description);
-    SafeFree(gConfigNetwork.server_greeting);
-    SafeFree(gConfigNetwork.master_server_url);
-    SafeFree(gConfigNetwork.provider_name);
-    SafeFree(gConfigNetwork.provider_email);
-    SafeFree(gConfigNetwork.provider_website);
     SafeFree(gConfigFonts.file_name);
     SafeFree(gConfigFonts.font_name);
 }

@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -64,7 +64,7 @@ static exitcode_t HandleUriJoin(const std::vector<std::string>& args)
     {
         // Set the network start configuration
         gNetworkStart = NETWORK_MODE_CLIENT;
-        String::Set(gNetworkStartHost, sizeof(gNetworkStartHost), hostname.c_str());
+        gNetworkStartHost = hostname;
         gNetworkStartPort = port;
         return EXITCODE_CONTINUE;
     }

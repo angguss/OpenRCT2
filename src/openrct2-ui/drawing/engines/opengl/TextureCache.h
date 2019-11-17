@@ -1,5 +1,5 @@
 /*****************************************************************************
- * Copyright (c) 2014-2018 OpenRCT2 developers
+ * Copyright (c) 2014-2019 OpenRCT2 developers
  *
  * For a complete list of all authors, please refer to contributors.md
  * Interested in contributing? Visit https://github.com/OpenRCT2/OpenRCT2
@@ -15,7 +15,11 @@
 #include <SDL_pixels.h>
 #include <algorithm>
 #include <array>
+#include <mutex>
 #include <openrct2/common.h>
+#ifndef __MACOSX__
+#    include <shared_mutex>
+#endif
 #include <unordered_map>
 #include <vector>
 
@@ -31,8 +35,8 @@ struct GlyphId
         size_t operator()(const GlyphId& k) const
         {
             size_t hash = k.Image * 7;
-            hash += (k.Palette & 0xFFFFFFFF) * 13;
-            hash += (k.Palette >> 32) * 23;
+            hash += (k.Palette & 0xFFFFFFFFUL) * 13;
+            hash += (k.Palette >> 32UL) * 23;
             return hash;
         }
     };
@@ -107,14 +111,14 @@ public:
 
     AtlasTextureInfo Allocate(int32_t actualWidth, int32_t actualHeight)
     {
-        assert(_freeSlots.size() > 0);
+        assert(!_freeSlots.empty());
 
         GLuint slot = _freeSlots.back();
         _freeSlots.pop_back();
 
         auto bounds = GetSlotCoordinates(slot, actualWidth, actualHeight);
 
-        AtlasTextureInfo info;
+        AtlasTextureInfo info{};
         info.index = _index;
         info.slot = slot;
         info.bounds = bounds;
@@ -132,15 +136,15 @@ public:
 
     // Checks if specified image would be tightly packed in this atlas
     // by checking if it is within the right power of 2 range
-    bool IsImageSuitable(int32_t actualWidth, int32_t actualHeight) const
+    [[nodiscard]] bool IsImageSuitable(int32_t actualWidth, int32_t actualHeight) const
     {
         int32_t imageOrder = CalculateImageSizeOrder(actualWidth, actualHeight);
-        int32_t atlasOrder = (int32_t)log2(_imageSize);
+        int32_t atlasOrder = log2(_imageSize);
 
         return imageOrder == atlasOrder;
     }
 
-    int32_t GetFreeSlots() const
+    [[nodiscard]] int32_t GetFreeSlots() const
     {
         return (int32_t)_freeSlots.size();
     }
@@ -158,7 +162,7 @@ public:
     }
 
 private:
-    ivec4 GetSlotCoordinates(GLuint slot, int32_t actualWidth, int32_t actualHeight) const
+    [[nodiscard]] ivec4 GetSlotCoordinates(GLuint slot, int32_t actualWidth, int32_t actualHeight) const
     {
         int32_t row = slot / _cols;
         int32_t col = slot % _cols;
@@ -171,7 +175,7 @@ private:
         };
     }
 
-    vec4 NormalizeCoordinates(const ivec4& coords) const
+    [[nodiscard]] vec4 NormalizeCoordinates(const ivec4& coords) const
     {
         return vec4{
             coords.x / (float)_atlasWidth,
@@ -199,6 +203,16 @@ private:
 
     GLuint _paletteTexture = 0;
 
+#ifndef __MACOSX__
+    std::shared_mutex _mutex;
+    typedef std::shared_lock<std::shared_mutex> shared_lock;
+    typedef std::unique_lock<std::shared_mutex> unique_lock;
+#else
+    std::mutex _mutex;
+    typedef std::unique_lock<std::mutex> shared_lock;
+    typedef std::unique_lock<std::mutex> unique_lock;
+#endif
+
 public:
     TextureCache();
     ~TextureCache();
@@ -217,8 +231,8 @@ private:
     AtlasTextureInfo LoadImageTexture(uint32_t image);
     AtlasTextureInfo LoadGlyphTexture(uint32_t image, uint8_t* palette);
     AtlasTextureInfo AllocateImage(int32_t imageWidth, int32_t imageHeight);
-    rct_drawpixelinfo GetImageAsDPI(uint32_t image, uint32_t tertiaryColour);
-    rct_drawpixelinfo GetGlyphAsDPI(uint32_t image, uint8_t* palette);
+    static rct_drawpixelinfo GetImageAsDPI(uint32_t image, uint32_t tertiaryColour);
+    static rct_drawpixelinfo GetGlyphAsDPI(uint32_t image, uint8_t* palette);
     void FreeTextures();
 
     static rct_drawpixelinfo CreateDPI(int32_t width, int32_t height);
