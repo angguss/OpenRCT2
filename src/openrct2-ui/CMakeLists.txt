@@ -60,6 +60,10 @@ if (NOT DISABLE_OPENGL)
     endif ()
 endif ()
 
+if (ENABLE_PHYSFS)
+    target_link_libraries(${PROJECT} physfs)
+endif ()
+
 # Includes
 target_include_directories(${PROJECT} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/.."
                                               ${SPEEX_INCLUDE_DIRS})
