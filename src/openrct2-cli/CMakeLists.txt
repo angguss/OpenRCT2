@@ -13,8 +13,12 @@ file(GLOB_RECURSE OPENRCT2_CLI_SOURCES
     "${CMAKE_CURRENT_LIST_DIR}/*.h"
     "${CMAKE_CURRENT_LIST_DIR}/*.hpp")
 
+
 add_executable(${PROJECT_NAME} ${OPENRCT2_CLI_SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_LIST_DIR}/..")
 ipo_set_target_properties(${PROJECT_NAME})
 target_link_libraries(${PROJECT_NAME} libopenrct2 Threads::Threads)
+if (ENABLE_PHYSFS)
+    target_link_libraries(${PROJECT_NAME} physfs)
+endif ()
 target_link_platform_libraries(${PROJECT_NAME})
