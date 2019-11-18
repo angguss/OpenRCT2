@@ -49,4 +49,18 @@ bool platform_file_delete_physfs(const utf8* path)
     return PHYSFS_delete(path);
 }
 
+time_t platform_file_get_modified_time_physfs(const utf8* path)
+{
+    PHYSFS_Stat stats;
+    if (PHYSFS_stat(path, &stats) != 0)
+    {
+        return stats.modtime;
+    }
+    else
+    {
+        // Copy how posix works
+        return 100;
+    }
+}
+
 #endif

@@ -830,7 +830,7 @@ static void window_loadsave_populate_list(rct_window* w, int32_t includeNewItem,
         w->disabled_widgets |= (1 << WIDX_NEW_FILE) | (1 << WIDX_NEW_FOLDER) | (1 << WIDX_UP);
         LoadSaveListItem root;
         root.path = std::string("/");
-        root.name = "PhysRoot";
+        root.name = "/";
         root.type = TYPE_DIRECTORY;
         _listItems.push_back(root);
     }

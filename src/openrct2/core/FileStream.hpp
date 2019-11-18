@@ -71,12 +71,18 @@ public:
         {
             case FILE_MODE_OPEN:
                 _file = PHYSFS_openRead(path_str.c_str());
+                _canRead = true;
+                _canWrite = false;
                 break;
             case FILE_MODE_WRITE:
                 _file = PHYSFS_openWrite(path_str.c_str());
+                _canRead = false;
+                _canWrite = true;
                 break;
             case FILE_MODE_APPEND:
                 _file = PHYSFS_openAppend(path);
+                _canRead = false;
+                _canWrite = true;
                 break;
         }
         _path = path_str;
@@ -245,29 +251,38 @@ public:
         if (length <= remainingBytes)
         {
 #ifdef ENABLE_PHYSFS
-            // Existing code (save game) reads a file open in write mode,
-            // so this is necessary
-            if (_canRead == false)
+            // Workaround for physfs only allowing a file to be in
+            // read or write mode at once
+            if (!_canRead)
             {
-                PHYSFS_sint64 previousPos = PHYSFS_tell(_file);
+                PHYSFS_sint32 previousPos = PHYSFS_tell(_file);
+                // Close the existing file (write mode);
                 PHYSFS_close(_file);
-                PHYSFS_File* f = PHYSFS_openRead(_path.c_str());
-                if (f)
+                // Open the file in read mode
+                _file = PHYSFS_openRead(_path.c_str());
+                PHYSFS_seek(_file, previousPos);
+                // Perform the read
+                bool readSuccess = false;
+                if (PHYSFS_readBytes(_file, buffer, length) > 0)
                 {
-                    PHYSFS_seek(f, previousPos);
-                    PHYSFS_readBytes(f, buffer, length);
-                    PHYSFS_close(f);
-                    _file = PHYSFS_openWrite(_path.c_str());
-                    PHYSFS_seek(_file, previousPos);
+                    readSuccess = true;
+                }
+                // Close the read mode file regardless 
+                // if successful
+                previousPos = PHYSFS_tell(_file);
+                PHYSFS_close(_file);
+                _file = PHYSFS_openWrite(_path.c_str());
+                PHYSFS_seek(_file, previousPos);
+                // Skip the exception
+                if (readSuccess)
+                    return;
+            }
+            else 
+            {
+                if (PHYSFS_readBytes(_file, buffer, length) > 0)
+                {
                     return;
                 }
-            }
-            else
-            {
-                // Physfs returns a negative value for a failed read so if it's
-                // read anything, assume it's successful
-                if (PHYSFS_readBytes(_file, buffer, length) >= 0)
-                    return;
             }
 #else
             if (fread(buffer, (size_t)length, 1, _file) == 1)

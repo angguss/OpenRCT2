@@ -422,6 +422,10 @@ bool platform_file_delete(const utf8* path)
 
 time_t platform_file_get_modified_time(const utf8* path)
 {
+#if defined(ENABLE_PHYSFS)
+    if (platform_physfs_initialized())
+        return platform_file_get_modified_time_physfs(path);
+#endif
     struct stat buf;
     if (stat(path, &buf) == 0)
     {

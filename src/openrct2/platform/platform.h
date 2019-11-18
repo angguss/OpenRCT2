@@ -156,6 +156,7 @@ bool platform_directory_exists_physfs(const utf8* path);
 bool platform_ensure_directory_exists_physfs(const utf8* path);
 bool platform_directory_delete_physfs(const utf8* path);
 bool platform_file_delete_physfs(const utf8* path);
+time_t platform_file_get_modified_time_physfs(const utf8* path);
 #endif
 
 // Windows specific definitions
