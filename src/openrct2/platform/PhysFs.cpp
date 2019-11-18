@@ -2,6 +2,20 @@
 
 #    include "platform.h"
 
+static bool _physfsInitialized = false;
+
+void platform_physfs_initialize() {
+    if (!_physfsInitialized)
+    {
+        PHYSFS_init(nullptr);
+        _physfsInitialized = true;
+    }
+}
+
+bool platform_physfs_initialized() {
+    return _physfsInitialized;
+}
+
 bool platform_file_exists_physfs(const utf8* path)
 {
     return PHYSFS_exists(path);

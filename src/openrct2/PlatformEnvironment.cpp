@@ -131,7 +131,7 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
     basePaths[(size_t)DIRBASE::DOCUMENTATION] = Platform::GetDocsPath();
 
 #ifdef ENABLE_PHYSFS
-    PHYSFS_init(nullptr);
+    platform_physfs_initialize();
 
     std::string userPath(basePaths[(size_t)DIRBASE::USER]);
 #ifdef _WIN32
