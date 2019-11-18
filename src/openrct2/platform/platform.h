@@ -149,6 +149,8 @@ void core_init();
 #ifdef ENABLE_PHYSFS
 #    include <physfs.h>
 
+void platform_physfs_initialize();
+bool platform_physfs_initialized();
 bool platform_file_exists_physfs(const utf8* path);
 bool platform_directory_exists_physfs(const utf8* path);
 bool platform_ensure_directory_exists_physfs(const utf8* path);
