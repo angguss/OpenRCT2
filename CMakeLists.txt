@@ -117,6 +117,9 @@ endif ()
 if (ENABLE_LIGHTFX)
     add_definitions(-D__ENABLE_LIGHTFX__)
 endif ()
+if (ENABLE_PHYSFS)
+    add_definitions(-DENABLE_PHYSFS)
+endif ()
 
 if (CXX_WARN_SUGGEST_FINAL_TYPES)
     # Disable -Wsuggest-final-types via pragmas where due.
@@ -244,61 +247,6 @@ else ()
         set(CMAKE_POSITION_INDEPENDENT_CODE ON)
     endif ()
 endif ()
-
-# Defines
-if (USE_MMAP)
-    add_definitions(-DUSE_MMAP)
-endif ()
-if (DISABLE_NETWORK)
-    add_definitions(-DDISABLE_NETWORK)
-endif ()
-if (DISABLE_HTTP_TWITCH)
-    add_definitions(-DDISABLE_HTTP)
-    add_definitions(-DDISABLE_TWITCH)
-endif ()
-if (DISABLE_TTF)
-    add_definitions(-DNO_TTF)
-endif ()
-if (ENABLE_LIGHTFX)
-    add_definitions(-D__ENABLE_LIGHTFX__)
-endif ()
-if (ENABLE_PHYSFS)
-    add_definitions(-DENABLE_PHYSFS)
-endif ()
-
-if (CXX_WARN_SUGGEST_FINAL_TYPES)
-    # Disable -Wsuggest-final-types via pragmas where due.
-   add_definitions(-D__WARN_SUGGEST_FINAL_TYPES__)
-endif ()
-
-if (CXX_WARN_SUGGEST_FINAL_METHODS)
-    # Disable -Wsuggest-final-methods via pragmas where due.
-   add_definitions(-D__WARN_SUGGEST_FINAL_METHODS__)
-endif ()
-
-if(EXISTS "${ROOT_DIR}/discord-rpc")
-    # Don't build discord's examples, some of which are in C and do not honour
-    # the flags we set for C++. Also we don't use the provided examples.
-    set(BUILD_EXAMPLES OFF CACHE BOOL "Build example apps")
-    add_subdirectory("${ROOT_DIR}/discord-rpc")
-    add_definitions(-D__ENABLE_DISCORD__)
-    include_directories("${ROOT_DIR}/discord-rpc/include")
-    set(HAVE_DISCORD_RPC TRUE)
-    message("Building with discord-rpc support")
-else()
-	message("No discord-rpc detected, to enable clone discord-rpc to root directory: ${ROOT_DIR}")
-endif()
-
-# Copied from https://github.com/opencv/opencv/blob/dcdd6af5a856826fe62c95322145731e702e54c5/cmake/OpenCVDetectCXXCompiler.cmake#L63-L70
-if(MSVC64 OR MINGW64)
-    set(X86_64 1)
-elseif(MINGW OR (MSVC AND NOT CMAKE_CROSSCOMPILING))
-    set(X86 1)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "amd64.*|x86_64.*|AMD64.*")
-    set(X86_64 1)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "i686.*|i386.*|x86.*|amd64.*|AMD64.*")
-    set(X86 1)
-endif()
 
 # Include sub-projects
 include("${ROOT_DIR}/src/openrct2/CMakeLists.txt" NO_POLICY_SCOPE)
