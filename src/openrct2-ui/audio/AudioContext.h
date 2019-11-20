@@ -15,6 +15,10 @@
 #include <openrct2/common.h>
 #include <string>
 
+#if defined(ENABLE_PHYSFS)
+#include <physfs.h>
+#endif
+
 struct SDL_RWops;
 using SpeexResamplerState = struct SpeexResamplerState_;
 
@@ -65,7 +69,11 @@ namespace OpenRCT2::Audio
         IAudioSource* CreateMemoryFromCSS1(const std::string& path, size_t index, const AudioFormat* targetFormat = nullptr);
         IAudioSource* CreateMemoryFromWAV(const std::string& path, const AudioFormat* targetFormat = nullptr);
         IAudioSource* CreateStreamFromWAV(const std::string& path);
+#if defined(ENABLE_PHYSFS)
+        IAudioSource* CreateStreamFromWAV(PHYSFS_File *rw);
+#else
         IAudioSource* CreateStreamFromWAV(SDL_RWops* rw);
+#endif
     } // namespace AudioSource
 
     namespace AudioChannel

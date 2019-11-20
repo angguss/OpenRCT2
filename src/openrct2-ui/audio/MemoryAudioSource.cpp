@@ -75,7 +75,12 @@ namespace OpenRCT2::Audio
             Unload();
 
             bool result = false;
+#if defined(ENABLE_PHYSFS)
+            std::vector<uint8_t> readBuffer;
+            SDL_RWops* rw = LoadPhysfsToRw(path, readBuffer);
+#else
             SDL_RWops* rw = SDL_RWFromFile(path, "rb");
+#endif
             if (rw != nullptr)
             {
                 SDL_AudioSpec audiospec = {};
@@ -109,7 +114,12 @@ namespace OpenRCT2::Audio
             Unload();
 
             bool result = false;
+#if defined(ENABLE_PHYSFS)
+            std::vector<uint8_t> readBuffer;
+            SDL_RWops* rw = LoadPhysfsToRw(path, readBuffer);
+#else
             SDL_RWops* rw = SDL_RWFromFile(path, "rb");
+#endif
             if (rw != nullptr)
             {
                 uint32_t numSounds;
@@ -194,6 +204,27 @@ namespace OpenRCT2::Audio
 
             _length = 0;
         }
+
+#if defined(ENABLE_PHYSFS)
+        SDL_RWops* LoadPhysfsToRw(const utf8* path, std::vector<uint8_t> &readBuffer) 
+        {
+            PHYSFS_Stat stat;
+            PHYSFS_File* f = nullptr;
+            
+            PHYSFS_stat(path, &stat);
+            readBuffer.resize(stat.filesize);
+            f = PHYSFS_openRead(path);
+            
+            if (f == nullptr)
+                return nullptr;
+            
+            PHYSFS_readBytes(f, readBuffer.data(), stat.filesize);
+            PHYSFS_close(f);
+
+            SDL_RWops* rw = SDL_RWFromMem(readBuffer.data(), stat.filesize);
+            return rw;
+        }
+#endif
     };
 
     IAudioSource* AudioSource::CreateMemoryFromCSS1(const std::string& path, size_t index, const AudioFormat* targetFormat)
