@@ -132,27 +132,24 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
 
 #ifdef ENABLE_PHYSFS
     platform_physfs_initialize();
-
+    
     std::string userPath(basePaths[(size_t)DIRBASE::USER]);
 #ifdef _WIN32
     Path::ConvertPathSlashes(userPath);
 #endif
     PHYSFS_mount(basePaths[(size_t)DIRBASE::USER].c_str(), "/", 0);
-
     PHYSFS_setWriteDir(basePaths[(size_t)DIRBASE::USER].c_str());
-    std::string exePath = Platform::GetCurrentExecutablePath();
-    Path::ConvertPathSlashes(exePath, false);
-    PHYSFS_mount(Path::Combine(Path::GetDirectory(exePath), "openrct2.zip").c_str(), NULL, 0);
+    PHYSFS_mount(Path::Combine(basePaths[(size_t)DIRBASE::USER], "openrct2.zip").c_str(), NULL, 0);
     
     for (int i = 0; i < DIRBASE_COUNT; i++)
     {
         basePaths[i] = "/";
     }
 
+    basePaths[(size_t)DIRBASE::RCT1] = "";
+    basePaths[(size_t)DIRBASE::RCT2] = "";
     basePaths[(size_t)DIRBASE::OPENRCT2] = "/data";
-    basePaths[(size_t)DIRBASE::USER] = "/";
-    basePaths[(size_t)DIRBASE::CONFIG] = "/";
-    basePaths[(size_t)DIRBASE::CACHE] = "/";
+
 #endif
     // Override paths that have been specified via the command line
     if (!String::IsNullOrEmpty(gCustomRCT1DataPath))
@@ -211,11 +208,7 @@ std::unique_ptr<IPlatformEnvironment> OpenRCT2::CreatePlatformEnvironment()
 // clang-format off
 const char * PlatformEnvironment::DirectoryNamesRCT2[] =
 {
-#ifdef ENABLE_PHYSFS
-    "data",
-#else
     "Data",                 // DATA
-#endif
     "Landscapes",           // LANDSCAPE
     nullptr,                // LANGUAGE
     nullptr,                // LOG_CHAT
