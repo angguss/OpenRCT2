@@ -12,14 +12,17 @@
 
 #    include "IStream.hpp"
 
+#    include <vector>
 #    include <zip.h>
+
 
 class ZipArchive final : public IZipArchive
 {
 private:
     zip_t* _zip;
 #ifdef ENABLE_PHYSFS
-    PHYSFS_File* file;
+    PHYSFS_File* _file;
+    std::vector<uint8_t> readBuffer;
 #endif
     ZIP_ACCESS _access;
     std::vector<std::vector<uint8_t>> _writeBuffers;
@@ -35,21 +38,21 @@ public:
 #ifdef ENABLE_PHYSFS
         if (access == ZIP_ACCESS::WRITE)
         {
-            file = PHYSFS_openWrite(path.data());
+            _file = PHYSFS_openWrite(path.data());
         }
         else
         {
-            file = PHYSFS_openRead(path.data());
+            _file = PHYSFS_openRead(path.data());
         }
 
         PHYSFS_Stat stat;
         PHYSFS_stat(path.data(), &stat);
         if (access == ZIP_ACCESS::READ)
         {
-            uint8_t* buf = new uint8_t[stat.filesize];
-            PHYSFS_readBytes(file, buf, stat.filesize);
+            readBuffer.resize(stat.filesize);
+            PHYSFS_readBytes(_file, readBuffer.data(), stat.filesize);
             zip_error_t er;
-            zip_source_t* zipbuffer = zip_source_buffer_create(buf, stat.filesize, 1, &er);
+            zip_source_t* zipbuffer = zip_source_buffer_create(readBuffer.data(), stat.filesize, 1, &er);
             _zip = zip_open_from_source(zipbuffer, 0, &er);
         }
         else
@@ -73,7 +76,7 @@ public:
     {
         zip_close(_zip);
 #ifdef ENABLE_PHYSFS
-        PHYSFS_close(file);
+        PHYSFS_close(_file);
 #endif
     }
 
